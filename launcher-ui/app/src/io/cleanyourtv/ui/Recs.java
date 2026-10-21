@@ -202,7 +202,7 @@ final class Recs {
 
     /** Name of the service the pick is on ("Netflix"), or empty. */
     static String serviceName(Pick p) {
-        return p == null || p.app == null ? "" : SERVICE_NAME.get(p.app);
+        return p == null || p.app == null ? "" : SERVICE_NAME.containsKey(p.app) ? SERVICE_NAME.get(p.app) : p.app;
     }
 
     /** The pick's ready backdrop (or null: builds it in the background and notifies when it's ready). */
@@ -377,8 +377,9 @@ final class Recs {
         JSONArray providers = get("/watch/providers/movie?language=" + lang() + "&watch_region=" + REGION).getJSONArray("results");
         for (int i = 0; i < providers.length(); i++) {
             JSONObject o = providers.getJSONObject(i);
-            String[] s = service(o.optString("provider_name"));
-            if (s != null && installed(s[2])) services.put(o.getInt("provider_id"), s);
+            int pid = o.getInt("provider_id");
+            String pname = o.optString("provider_name"), pkg = Providers.app(context, pid, pname);
+            if (pkg != null) services.put(pid, new String[] {pname, pname, pkg});
         }
         if (services.isEmpty()) throw new IOException("none of the TV's streaming services are on TMDB");
         StringBuilder ids = new StringBuilder();
@@ -485,13 +486,15 @@ final class Recs {
         JSONObject br = wp == null ? null : wp.optJSONObject("results") == null ? null : wp.optJSONObject("results").optJSONObject(REGION);
         JSONArray flat = br == null ? null : br.optJSONArray("flatrate");
         for (int i = 0; flat != null && i < flat.length() && p.app == null; i++) {
-            String[] s = service(flat.getJSONObject(i).optString("provider_name"));
-            if (s != null && installed(s[2])) {
+            JSONObject fp = flat.getJSONObject(i);
+            String pkg = Providers.app(context, fp.optInt("provider_id"), fp.optString("provider_name"));
+            String[] s = pkg == null ? null : new String[] {fp.optString("provider_name"), fp.optString("provider_name"), pkg};
+            if (s != null) {
                 p.app = s[1];
                 p.pkg = s[2];
             }
         }
-        if (p.app != null) parts.add(SERVICE_NAME.get(p.app));
+        if (p.app != null) parts.add(SERVICE_NAME.containsKey(p.app) ? SERVICE_NAME.get(p.app) : p.app);
         p.meta = String.join(" · ", parts);
         p.detailed = true;
     }
@@ -576,6 +579,7 @@ final class Recs {
     private long sourceStamp() {
         long stamp = Config.TMDB_KEY.hashCode() * 31L + REGION.hashCode();
         for (String[] service : SERVICES) stamp = stamp * 31L + (installed(service[2]) ? service[2].hashCode() : 0);
+        stamp = stamp * 31L + Prefs.providersStamp();
         return stamp;
     }
 

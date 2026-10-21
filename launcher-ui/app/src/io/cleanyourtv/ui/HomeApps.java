@@ -56,7 +56,7 @@ final class HomeApps {
 
     static final int APP = 0, LIVE_TV = 1, INPUT = 2, ALL_APPS = 3, SETTINGS = 4, ANDROID_SETTINGS = 5;
     /** The "HDMI Inputs" button: opens the bottom drawer on the inputs (the home screen handles it). */
-    static final int INPUTS = 7;
+    static final int INPUTS = 7, EXPLORE = 8;
     /** Image size of each card (16:9; on screen it shows up to ~330 px wide). */
     static final int TILE_W = 384, TILE_H = 216;
 
@@ -329,6 +329,7 @@ final class HomeApps {
         skip.addAll(java.util.Arrays.asList(LIVE_TV_APPS));
         skip.add(c.getPackageName());
         skip.addAll(HIDDEN);
+        skip.addAll(Prefs.hidden());
         List<Item> items = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (String[] app : launchable(c)) {
@@ -375,6 +376,9 @@ final class HomeApps {
                 break;
             case ANDROID_SETTINGS:
                 intent = new Intent(Settings.ACTION_SETTINGS);
+                break;
+            case EXPLORE:
+                intent = new Intent().setComponent(new ComponentName(a, ExploreActivity.class));
                 break;
             default:
                 return false;

@@ -1,0 +1,264 @@
+package io.cleanyourtv.ui;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * The TMDB API for Explore, the title page and the account (watchlist, ratings). Answers are kept for ten minutes.
+ * The account is TMDB's v3 session: a request token the person approves on their phone, then a session id kept in
+ * the app's settings. Without an account, "My list" and "Seen" are kept on the TV.
+ */
+final class Tmdb {
+    private Tmdb() {}
+
+    static final String API = "https://api.themoviedb.org/3";
+    static final String POSTER = "https://image.tmdb.org/t/p/w342", BACKDROP = "https://image.tmdb.org/t/p/w1280",
+            LOGO = "https://image.tmdb.org/t/p/w92", PROFILE = "https://image.tmdb.org/t/p/w185";
+    static final String REGION = Config.TMDB_REGION.trim().isEmpty() ? "BR" : Config.TMDB_REGION.trim().toUpperCase(Locale.ROOT);
+    private static final long TTL = 10 * 60_000L;
+
+    private static final Map<String, Object[]> CACHE = new LinkedHashMap<String, Object[]>(64, 0.75f, true) {
+        @Override protected boolean removeEldestEntry(Map.Entry<String, Object[]> e) { return size() > 120; }
+    };
+
+    static boolean hasKey() { return !Config.TMDB_KEY.trim().isEmpty(); }
+
+    static String lang() {
+        return "pt".equals(Ui.language) ? "pt-BR" : Ui.language;
+    }
+
+    /** GET a v3 path ("/trending/all/day?…"); language is added when the path has none. */
+    static JSONObject get(String path) throws IOException, JSONException {
+        String full = path + (path.contains("language=") ? "" : (path.contains("?") ? "&" : "?") + "language=" + lang());
+        synchronized (CACHE) {
+            Object[] hit = CACHE.get(full);
+            if (hit != null && System.currentTimeMillis() - (Long) hit[0] < TTL) return (JSONObject) hit[1];
+        }
+        JSONObject o = new JSONObject(call("GET", full, null));
+        synchronized (CACHE) { CACHE.put(full, new Object[] {System.currentTimeMillis(), o}); }
+        return o;
+    }
+
+    static void forget(String prefix) {
+        synchronized (CACHE) { CACHE.keySet().removeIf(k -> k.startsWith(prefix)); }
+    }
+
+    static JSONObject post(String path, JSONObject body) throws IOException, JSONException {
+        return new JSONObject(call("POST", path, body == null ? "{}" : body.toString()));
+    }
+
+    private static String call(String method, String path, String body) throws IOException {
+        String key = Config.TMDB_KEY.trim();
+        if (key.isEmpty()) throw new IOException(Ui.tr("sem chave do TMDB", "no TMDB key"));
+        boolean bearer = key.startsWith("eyJ");
+        String url = API + path + (bearer ? "" : (path.contains("?") ? "&" : "?") + "api_key=" + URLEncoder.encode(key, "UTF-8"));
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(10000);
+        c.setRequestMethod(method);
+        c.setRequestProperty("Accept", "application/json");
+        if (bearer) c.setRequestProperty("Authorization", "Bearer " + key);
+        if (body != null) {
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/json;charset=utf-8");
+            try (OutputStream out = c.getOutputStream()) { out.write(body.getBytes(StandardCharsets.UTF_8)); }
+        }
+        int code = c.getResponseCode();
+        InputStream in = code < 400 ? c.getInputStream() : c.getErrorStream();
+        String text = in == null ? "" : readAll(in);
+        c.disconnect();
+        if (code >= 400) throw new IOException("TMDB " + code + (text.isEmpty() ? "" : ": " + new JSONObjectSafe(text).message()));
+        return text;
+    }
+
+    static String readAll(InputStream in) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[16384];
+        int n;
+        while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+        in.close();
+        return out.toString("UTF-8");
+    }
+
+    private static final class JSONObjectSafe {
+        private final String text;
+        JSONObjectSafe(String text) { this.text = text; }
+        String message() {
+            try { return new JSONObject(text).optString("status_message", ""); } catch (JSONException e) { return ""; }
+        }
+    }
+
+    // MARK: - Titles
+
+    /** One poster in a row: a movie or a show. */
+    static final class Title {
+        final String kind;   // "movie" or "tv"
+        final int id;
+        final String name, poster, backdrop, year;
+        final double vote;
+
+        Title(String kind, int id, String name, String poster, String backdrop, String year, double vote) {
+            this.kind = kind;
+            this.id = id;
+            this.name = name;
+            this.poster = poster;
+            this.backdrop = backdrop;
+            this.year = year;
+            this.vote = vote;
+        }
+
+        String key() { return kind + ":" + id; }
+    }
+
+    /** The titles of a list answer; `kind` is used when the items don't say ("movie"/"tv" endpoints). */
+    static List<Title> titles(JSONObject page, String kind) {
+        List<Title> out = new ArrayList<>();
+        JSONArray results = page.optJSONArray("results");
+        for (int i = 0; results != null && i < results.length(); i++) {
+            JSONObject o = results.optJSONObject(i);
+            if (o == null) continue;
+            String k = o.optString("media_type", kind);
+            if (!"movie".equals(k) && !"tv".equals(k)) continue;
+            String poster = o.optString("poster_path", "");
+            if (poster.isEmpty() || "null".equals(poster)) continue;
+            String date = o.optString(k.equals("movie") ? "release_date" : "first_air_date", "");
+            out.add(new Title(k, o.optInt("id"), o.optString(k.equals("movie") ? "title" : "name"), poster,
+                    o.optString("backdrop_path", ""), date.length() >= 4 ? date.substring(0, 4) : "", o.optDouble("vote_average", 0)));
+        }
+        return out;
+    }
+
+    // MARK: - Account
+
+    private static SharedPreferences sp(Context c) {
+        return c.getSharedPreferences("tmdb", Context.MODE_PRIVATE);
+    }
+
+    static String session(Context c) { return sp(c).getString("session", ""); }
+    static int account(Context c) { return sp(c).getInt("account", 0); }
+    static String accountName(Context c) { return sp(c).getString("name", ""); }
+    static boolean signedIn(Context c) { return !session(c).isEmpty() && account(c) != 0; }
+
+    /** Step 1: a request token the person approves at themoviedb.org/authenticate/<token>. */
+    static String requestToken() throws IOException, JSONException {
+        return new JSONObject(call("GET", "/authentication/token/new", null)).getString("request_token");
+    }
+
+    /** Step 2, polled: a session once the token is approved; false while it isn't yet. */
+    static boolean finishSignIn(Context c, String token) throws IOException, JSONException {
+        String session;
+        try {
+            session = post("/authentication/session/new", new JSONObject().put("request_token", token)).optString("session_id");
+        } catch (IOException notYet) {
+            return false;
+        }
+        if (session.isEmpty()) return false;
+        JSONObject acc = new JSONObject(call("GET", "/account?session_id=" + session, null));
+        sp(c).edit().putString("session", session).putInt("account", acc.getInt("id"))
+                .putString("name", acc.optString("username")).apply();
+        return true;
+    }
+
+    static void signOut(Context c) {
+        String session = session(c);
+        sp(c).edit().clear().apply();
+        if (session.isEmpty()) return;
+        new Thread(() -> {
+            try { call("DELETE", "/authentication/session", new JSONObject().put("session_id", session).toString()); }
+            catch (Exception ignored) {}
+        }).start();
+    }
+
+    // MARK: - My list and seen (the account's, or kept on the TV)
+
+    static List<Title> watchlist(Context c) throws IOException, JSONException {
+        if (!signedIn(c)) return local(c, "list");
+        List<Title> out = new ArrayList<>();
+        for (String kind : new String[] {"tv", "movies"}) {
+            JSONObject page = new JSONObject(call("GET", "/account/" + account(c) + "/watchlist/" + kind
+                    + "?session_id=" + session(c) + "&language=" + lang() + "&sort_by=created_at.desc", null));
+            out.addAll(titles(page, kind.equals("tv") ? "tv" : "movie"));
+        }
+        return out;
+    }
+
+    static boolean inWatchlist(Context c, String kind, int id) {
+        if (!signedIn(c)) return localHas(c, "list", kind + ":" + id);
+        try {
+            JSONObject st = new JSONObject(call("GET", "/" + kind + "/" + id + "/account_states?session_id=" + session(c), null));
+            return st.optBoolean("watchlist");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    static void setWatchlist(Context c, Title t, boolean on) throws IOException, JSONException {
+        if (!signedIn(c)) {
+            localSet(c, "list", t, on);
+            return;
+        }
+        post("/account/" + account(c) + "/watchlist?session_id=" + session(c),
+                new JSONObject().put("media_type", t.kind).put("media_id", t.id).put("watchlist", on));
+    }
+
+    /** A rating from 1 to 10 on the account (needs the account). */
+    static void rate(Context c, Title t, int value) throws IOException, JSONException {
+        post("/" + t.kind + "/" + t.id + "/rating?session_id=" + session(c), new JSONObject().put("value", value));
+    }
+
+    static List<Title> seen(Context c) { return local(c, "seen"); }
+    static boolean isSeen(Context c, String kind, int id) { return localHas(c, "seen", kind + ":" + id); }
+    static void setSeen(Context c, Title t, boolean on) { localSet(c, "seen", t, on); }
+
+    private static List<Title> local(Context c, String list) {
+        List<Title> out = new ArrayList<>();
+        try {
+            JSONArray a = new JSONArray(sp(c).getString(list, "[]"));
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject o = a.getJSONObject(i);
+                out.add(new Title(o.getString("kind"), o.getInt("id"), o.optString("name"), o.optString("poster"),
+                        o.optString("backdrop"), o.optString("year"), o.optDouble("vote", 0)));
+            }
+        } catch (JSONException ignored) {
+        }
+        return out;
+    }
+
+    private static boolean localHas(Context c, String list, String key) {
+        for (Title t : local(c, list)) if (t.key().equals(key)) return true;
+        return false;
+    }
+
+    private static void localSet(Context c, String list, Title t, boolean on) {
+        List<Title> all = local(c, list);
+        all.removeIf(x -> x.key().equals(t.key()));
+        if (on) all.add(0, t);
+        JSONArray a = new JSONArray();
+        try {
+            for (Title x : all.subList(0, Math.min(all.size(), 200))) {
+                a.put(new JSONObject().put("kind", x.kind).put("id", x.id).put("name", x.name).put("poster", x.poster)
+                        .put("backdrop", x.backdrop).put("year", x.year).put("vote", x.vote));
+            }
+        } catch (JSONException ignored) {
+        }
+        sp(c).edit().putString(list, a.toString()).apply();
+    }
+}

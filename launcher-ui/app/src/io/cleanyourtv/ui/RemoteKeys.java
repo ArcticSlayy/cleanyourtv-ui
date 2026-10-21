@@ -1,61 +1,155 @@
 package io.cleanyourtv.ui;
 
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.tv.TvContract;
 import android.os.Build;
+import android.provider.Settings;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * The remote's app buttons on TCL TVs. The stock home screen opens the apps for Netflix, YouTube and Prime (and TCL
- * Channel); with it off, the keys still arrive, so we open the app the person picked (Settings > Remote Buttons).
- * Disney and Globoplay are opened by the system itself, so they are not listed. The YouTube button (BUTTON_3) never
- * reaches an app's window; only the accessibility service's key filter (RemoteKeyService) sees it.
- * On Vestel TVs only the Netflix button is ours: the system opens Netflix itself (a global key, after the filter).
+ * The remote's buttons. remote.json (examples/<model>/remote.json, pushed by launcher-ui/remote.sh) lists them: a
+ * "native" button is never touched, a "configurable" one runs the action the person picked in Settings > Remote
+ * Buttons, or its default. Without remote.json, TCL and Vestel TVs keep the app buttons Free My TV handled.
+ *
+ * Actions: a package, "input:<tv input id>", "live", "settings", "home", "tmdb:explore", "tmdb:watchlist", or ""
+ * (the button does what it did before).
  */
 final class RemoteKeys {
     private RemoteKeys() {}
 
-    /** Some TCL remotes (BT_RC833) send TCL's own YouTube key instead of BUTTON_3: the same button. */
-    private static final int KEY_YOUTUBE_TCL = 4065;
-
-    /**
-     * The key codes are the brand's own: on other brands they can be other buttons, so nothing here runs there.
-     * Vestel builds TVs sold under other brands (F&U...), so BRAND varies: check the maker too.
-     */
     static final boolean TCL = is("TCL"), VESTEL = is("Vestel");
-
-    static boolean supported() {
-        return TCL || VESTEL;
-    }
 
     private static boolean is(String maker) {
         return maker.equalsIgnoreCase(Build.MANUFACTURER) || maker.equalsIgnoreCase(Build.BRAND);
     }
 
-    /** Opens the app for this key on its first press. True if the key is ours and in use (it is then consumed). */
+    static final class Button {
+        final String id, name, dflt;
+        Button(String id, String name, String dflt) {
+            this.id = id;
+            this.name = name;
+            this.dflt = dflt;
+        }
+    }
+
+    private static final Object LOCK = new Object();
+    private static List<Button> cached;
+    private static String cachedRemote = "";
+    private static long cachedStamp = Long.MIN_VALUE;
+
+    /** The configurable buttons, from remote.json (re-read when it changes) or the built-in TCL/Vestel ones. */
+    static List<Button> buttons(Context c) {
+        synchronized (LOCK) {
+            File f = new File(TvConfig.dir(c), "remote.json");
+            long stamp = f.lastModified() * 31 + f.length();
+            if (cached != null && stamp == cachedStamp) return cached;
+            cachedStamp = stamp;
+            List<Button> out = new ArrayList<>();
+            String text = TvConfig.read(f);
+            cachedRemote = "";
+            if (text != null) {
+                try {
+                    JSONObject o = new JSONObject(text);
+                    cachedRemote = o.optString("remote");
+                    JSONArray list = o.getJSONArray("buttons");
+                    for (int i = 0; i < list.length(); i++) {
+                        JSONObject b = list.getJSONObject(i);
+                        if (!"configurable".equals(b.optString("kind"))) continue;
+                        String id = b.has("scan") ? "s" + b.getInt("scan") : b.has("key") ? "k" + b.getInt("key") : null;
+                        if (id != null) out.add(new Button(id, b.optString("name", id), b.optString("default")));
+                    }
+                } catch (Exception e) {
+                    AppLog.w("remote.json not read: " + e.getMessage());
+                    out.clear();
+                }
+            }
+            if (text == null && VESTEL) {
+                out.add(new Button("k" + KeyEvent.KEYCODE_STEM_1, Ui.tr("Botão Netflix", "Netflix button"), "com.netflix.ninja"));
+            } else if (text == null && TCL) {
+                out.add(new Button("k4062", Ui.tr("Botão Netflix", "Netflix button"), "com.netflix.ninja"));
+                out.add(new Button("k190", Ui.tr("Botão YouTube", "YouTube button"), "com.google.android.youtube.tv"));
+                out.add(new Button("k4099", Ui.tr("Botão Prime Video", "Prime Video button"), "com.amazon.amazonvideo.livingroom"));
+                out.add(new Button("k4020", Ui.tr("Botão TCL Channel", "TCL Channel button"), ""));
+            }
+            cached = out;
+            return out;
+        }
+    }
+
+    /** The remote's name from remote.json, or "" without one. */
+    static String remoteName(Context c) {
+        buttons(c);
+        return cachedRemote;
+    }
+
+    static String action(Button b) {
+        String picked = Prefs.button(b.id);
+        return picked != null ? picked : b.dflt;
+    }
+
+    /** Runs the button's action on its first press. True if the key is one of ours and in use (then consumed). */
     static boolean onKey(Context c, KeyEvent e) {
-        if (!supported()) return false;
         // BUTTON_3 is also a game controller's button: keys from a gamepad or a joystick are left alone.
         int source = e.getSource();
         if ((source & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
                 || (source & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK) return false;
-        int keyCode = e.getKeyCode() == KEY_YOUTUBE_TCL ? Prefs.KEY_YOUTUBE : e.getKeyCode();
-        boolean ours = false;
-        for (int key : Prefs.KEYS) ours |= key == keyCode;
-        if (!ours) return false;
-        String pkg = Prefs.keyApp(keyCode);
-        if (pkg.isEmpty()) return false;   // "Nothing": the key goes on as if we weren't here
-        if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) {
-            Intent intent = launchIntent(c.getPackageManager(), pkg);
-            AppLog.w("remote key " + e.getKeyCode() + " -> " + pkg + (intent == null ? " (not installed)" : ""));
-            if (intent != null) c.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        int keyCode = e.getKeyCode() == 4065 ? KeyEvent.KEYCODE_BUTTON_3 : e.getKeyCode();   // TCL's own YouTube key
+        String scan = "s" + e.getScanCode(), key = "k" + keyCode;
+        Button found = null;
+        for (Button b : buttons(c)) {
+            if (b.id.equals(scan)) { found = b; break; }
+            if (b.id.equals(key) && found == null) found = b;
         }
+        if (found == null) return false;
+        String action = action(found);
+        if (action.isEmpty()) return false;
+        if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) run(c, action);
         return true;
     }
 
-    /** The app's TV launcher, or its plain one (kept here, not in HomeApps, so the key process stays small). */
+    static void run(Context c, String action) {
+        Intent intent = intent(c, action);
+        AppLog.w("remote button -> " + action + (intent == null ? " (not available)" : ""));
+        if (intent == null) return;
+        try {
+            c.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (ActivityNotFoundException | SecurityException ignored) {
+        }
+    }
+
+    static Intent intent(Context c, String action) {
+        switch (action) {
+            case "home":
+                return new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(c.getPackageName());
+            case "settings":
+                return new Intent(Settings.ACTION_SETTINGS);
+            case "live":
+                return HomeApps.liveTv(c);
+            case "tmdb:explore":
+                return new Intent().setClassName(c, ExploreActivity.class.getName());
+            case "tmdb:watchlist":
+                return new Intent().setClassName(c, ExploreActivity.class.getName()).putExtra(ExploreActivity.EXTRA_SECTION, "watchlist");
+            default:
+                if (action.startsWith("input:")) {
+                    return new Intent(Intent.ACTION_VIEW).setDataAndType(
+                            TvContract.buildChannelUriForPassthroughInput(action.substring("input:".length())),
+                            "vnd.android.cursor.item/channel");
+                }
+                return launchIntent(c.getPackageManager(), action);
+        }
+    }
+
     private static Intent launchIntent(PackageManager pm, String pkg) {
         Intent intent = pm.getLeanbackLaunchIntentForPackage(pkg);
         return intent != null ? intent : pm.getLaunchIntentForPackage(pkg);

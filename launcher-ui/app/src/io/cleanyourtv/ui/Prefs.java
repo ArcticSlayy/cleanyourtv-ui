@@ -2,7 +2,6 @@ package io.cleanyourtv.ui;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.view.KeyEvent;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -21,13 +20,6 @@ import java.util.Locale;
 final class Prefs {
     private Prefs() {}
 
-    /** Remote keys we handle, with the app each opens until the user picks another. Codes read from the TCL's log. */
-    static final int KEY_NETFLIX = 4062, KEY_YOUTUBE = 190, KEY_PRIME = 4099, KEY_TCL_CHANNEL = 4020;
-    /** Vestel's Netflix button: STEM_1, which the TV hands to its Netflix key receiver (dumpsys window policy). */
-    static final int KEY_VESTEL_NETFLIX = KeyEvent.KEYCODE_STEM_1;
-    static final int[] KEYS = RemoteKeys.VESTEL ? new int[] {KEY_VESTEL_NETFLIX}
-            : new int[] {KEY_NETFLIX, KEY_YOUTUBE, KEY_PRIME, KEY_TCL_CHANNEL};
-
     /** Bumped by every change: screens compare it to know when to redraw. */
     static volatile int version;
 
@@ -35,7 +27,6 @@ final class Prefs {
 
     static void init(Context c) {
         app = c.getApplicationContext();
-        migrateKeys();   // before anything reads the button choices
         Ui.applyLanguage();   // the language picked on the TV, now that it can be read
     }
 
@@ -120,29 +111,46 @@ final class Prefs {
         put("shelf", sb.toString());
     }
 
-    // MARK: - Remote buttons
+    // MARK: - Hidden apps
 
-    private static String defaultApp(int keyCode) {
-        switch (keyCode) {
-            case KEY_NETFLIX: case KEY_VESTEL_NETFLIX: return "com.netflix.ninja";
-            case KEY_YOUTUBE: return "com.google.android.youtube.tv";
-            case KEY_PRIME: return "com.amazon.amazonvideo.livingroom";
-            case KEY_TCL_CHANNEL: return "";
-            default: return "";
-        }
+    /** Packages kept out of All Apps (config.json "hidden_apps"), on top of HomeApps' own list. */
+    static java.util.Set<String> hidden() {
+        return new java.util.HashSet<>(java.util.Arrays.asList(sp().getString("hidden", "").split(",")));
     }
 
+    static void setHidden(List<String> packages) { put("hidden", String.join(",", packages)); }
+
+    // MARK: - Recommendations
+
+    /** What a TMDB watch provider opens: a package, "off", or "" (the built-in match). */
+    static String provider(String id) { return sp().getString("provider." + id, ""); }
+    static void setProvider(String id, String value) { put("provider." + id, value == null ? "" : value); }
+
+    /** Changes whenever a service's app changes, so the picks are fetched again. */
+    static int providersStamp() {
+        int h = 0;
+        for (java.util.Map.Entry<String, ?> e : sp().getAll().entrySet()) {
+            if (e.getKey().startsWith("provider.")) h = h * 31 + (e.getKey() + "=" + e.getValue()).hashCode();
+        }
+        return h;
+    }
+
+    /** Picks from every provider in the region, not only the ones with an app on the TV. */
+    static boolean showAllProviders() { return sp().getBoolean("showAllProviders", false); }
+    static void setShowAllProviders(boolean on) { put("showAllProviders", on); }
+
+    // MARK: - Remote buttons
+
     // The key service runs in its own small process (:keys), so that a busy home screen can never delay the TV's keys.
-    // SharedPreferences are not shared between processes, so these few values live in a tiny file both processes read.
-    // The service asks on every key: the values stay in memory and the file is read again only when it changes.
+    // SharedPreferences are not shared between processes, so the button choices live in a tiny file both read.
+    // A line is "<button>=<action>": the button is "s<scancode>" or "k<keycode>"; RemoteKeys lists the actions.
     private static File keysFile() {
         return new File(app.getFilesDir(), "remote-keys.txt");
     }
 
-    private static final String[] keyApps = new String[KEYS.length];   // null = the default
+    private static final java.util.Map<String, String> buttons = new java.util.HashMap<>();
     private static long keysStamp = Long.MIN_VALUE;
 
-    /** A temporary file per process (two can start together after an update), synced before it replaces the old one. */
     private static boolean writeKeys(String text) {
         File tmp = new File(app.getFilesDir(), "remote-keys." + android.os.Process.myPid() + ".tmp");
         try (FileOutputStream out = new FileOutputStream(tmp)) {
@@ -156,47 +164,37 @@ final class Prefs {
         return tmp.renameTo(keysFile());
     }
 
-    /** Choices saved before they moved to the file (in SharedPreferences) are copied there once. */
-    private static void migrateKeys() {
-        if (keysFile().exists()) return;
-        SharedPreferences old = sp();
-        boolean any = false;
-        for (int key : KEYS) any |= old.contains("key" + key);
-        if (!any) return;
-        StringBuilder sb = new StringBuilder();
-        for (int key : KEYS) sb.append(key).append('=').append(old.getString("key" + key, defaultApp(key))).append('\n');
-        writeKeys(sb.toString());
-    }
-
-    /** Package the key opens ("" = nothing). */
-    static String keyApp(int keyCode) {
-        synchronized (keyApps) {
+    /** Every choice made for a button, re-read only when the file changed. */
+    static java.util.Map<String, String> buttons() {
+        synchronized (buttons) {
             File f = keysFile();
-            long stamp = f.lastModified() * 31 + f.length();   // 0 without the file: every key opens its default
+            long stamp = f.lastModified() * 31 + f.length();
             if (stamp != keysStamp) {
                 keysStamp = stamp;
-                java.util.Arrays.fill(keyApps, null);
-                if (stamp != 0) {
+                buttons.clear();
+                if (f.isFile()) {
                     try (BufferedReader r = new BufferedReader(new FileReader(f))) {
                         String line;
                         while ((line = r.readLine()) != null) {
-                            for (int i = 0; i < KEYS.length; i++) {
-                                String prefix = KEYS[i] + "=";
-                                if (line.startsWith(prefix)) keyApps[i] = line.substring(prefix.length());
-                            }
+                            int eq = line.indexOf('=');
+                            if (eq > 1) buttons.put(line.substring(0, eq), line.substring(eq + 1));
                         }
                     } catch (IOException ignored) {
                     }
                 }
             }
-            for (int i = 0; i < KEYS.length; i++) if (KEYS[i] == keyCode && keyApps[i] != null) return keyApps[i];
-            return defaultApp(keyCode);
+            return new java.util.HashMap<>(buttons);
         }
     }
 
-    static void setKeyApp(int keyCode, String pkg) {
+    /** The action picked for a button, or null when the person never picked one (remote.json's default applies). */
+    static String button(String id) { return buttons().get(id); }
+
+    static void setButton(String id, String action) {
+        java.util.Map<String, String> all = buttons();
+        if (action == null) all.remove(id); else all.put(id, action);
         StringBuilder sb = new StringBuilder();
-        for (int key : KEYS) sb.append(key).append('=').append(key == keyCode ? pkg : keyApp(key)).append('\n');
+        for (java.util.Map.Entry<String, String> e : all.entrySet()) sb.append(e.getKey()).append('=').append(e.getValue()).append('\n');
         if (writeKeys(sb.toString())) version++;
     }
 }
