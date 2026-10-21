@@ -67,6 +67,20 @@ Controle** só lista os `configurable`; os `native` nunca aparecem nem são inte
 O serviço de acessibilidade que lê os botões é ligado pelo `build-and-install.sh` (`HOME_KEY_SERVICE=1`), como no
 CleanYourTV, e funciona com o ADB desligado depois.
 
+## Explorar: o diferencial (TMDB)
+
+Uma tela própria para **navegar** em filmes e séries, não só as 3 sugestões da Home:
+
+- **Em alta**, **lançamentos**, **populares** e por **gênero**, em fileiras roláveis com pôster, separadas em Filmes e
+  Séries (`/trending`, `/discover`, `/movie/now_playing`, `/tv/on_the_air`, `/genre`).
+- **Página do título:** sinopse, nota, elenco, temporadas, trailer, e **onde está disponível no Brasil**
+  (`/watch/providers`, região BR), com um botão que abre o app mapeado (ou o "abrir com" escolhido, ex.: Tomato).
+- **Recomendações pelo seu histórico:** a partir do que você marca como assistido ou avalia, da sua watchlist e dos
+  favoritos da conta TMDB, o app junta `/recommendations` e `/similar` de cada título e monta "Porque você viu X".
+  Com login TMDB, avaliar e salvar na watchlist pela TV escrevem na sua conta.
+- O histórico de visualização dos apps (Netflix etc.) não é acessível a outro app; o "histórico" aqui é o que você
+  marca na TV e o da sua conta TMDB.
+
 ## Recomendações e watchlist (TMDB)
 
 - Chave TMDB em `launcher-ui/config.properties` (fora do git), como no Free My TV.
@@ -83,12 +97,13 @@ CleanYourTV, e funciona com o ADB desligado depois.
 2. **Configuração:** `config.json` por tema (prateleira, cidade, colunas) enviado pelo `launcher-ui/theme.sh`, e a
    tela de ajustes.
 3. **Botões:** `remote.json` da 55C725, serviço de teclas, tela Botões do Controle.
-4. **TMDB:** tela Recomendações com "abrir com" e "mostrar todos"; login e watchlist no botão Marcador.
+4. **TMDB:** tela Explorar (em alta, gêneros, página do título com onde assistir); tela Recomendações com "abrir
+   com" e "mostrar todos"; login, watchlist no botão Marcador, avaliações e recomendações pelo histórico.
 5. **Docs e prompt:** `PROMPT.ui.md`, custo em tokens, como manter o fork em dia com o upstream.
 
-## Decisões para aprovar
+## Decisões (aprovadas em 2026-10-21)
 
-- **Build do `launcher-ui`:** manter o `build.sh` sem Gradle do Free My TV (APK de ~2 MB, build em segundos) ou
-  migrar para Gradle como o `launcher/`. Proposta: manter sem Gradle, menos código para portar.
+- **Build do `launcher-ui`:** o `build.sh` sem Gradle do Free My TV.
 - **Nome do pacote Android:** `io.cleanyourtv.ui`.
-- **Idiomas:** os 5 do Free My TV (pt, en, es, de, ru) no começo.
+- **Idiomas:** foco em português nesta primeira versão; o código de tradução do Free My TV fica, sem trabalho extra
+  nos outros idiomas por enquanto.
