@@ -1,7 +1,19 @@
 {
-  "shelf": ["com.netflix.ninja", "com.disney.disneyplus", "com.hbo.hbonow", "com.google.android.youtube.tv"],
-  "hidden_apps": ["com.tcl.browser", "com.tcl.gallery"],
-  "city": { "name": "São Paulo", "latitude": -23.5505, "longitude": -46.6333 },
+  "shelf": [
+    "com.netflix.ninja",
+    "com.disney.disneyplus",
+    "com.hbo.hbonow",
+    "com.google.android.youtube.tv"
+  ],
+  "hidden_apps": [
+    "com.tcl.browser",
+    "com.tcl.gallery"
+  ],
+  "city": {
+    "name": "São Paulo",
+    "latitude": -23.5505,
+    "longitude": -46.6333
+  },
   "theme": "auto",
   "temperature": "C",
   "weather": true,
@@ -14,5 +26,11 @@
   "providers": {
     "283": "com.crunchyroll.crunchyroid"
   },
-  "show_all_providers": false
+  "show_all_providers": false,
+  "app_tiles": {
+    "com.tomatos.clientapp": {
+      "logo": "https://example.com/tomato-logo.png",
+      "color": "#D32F2F"
+    }
+  }
 }

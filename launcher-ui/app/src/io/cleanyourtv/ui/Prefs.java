@@ -120,6 +120,16 @@ final class Prefs {
 
     static void setHidden(List<String> packages) { put("hidden", String.join(",", packages)); }
 
+    // MARK: - Custom tiles
+
+    /** "logo source|#RRGGBB" for a styled shelf tile, or "" (CustomTiles). */
+    static String tile(String pkg) { return sp().getString("tile." + pkg, ""); }
+
+    static void setTile(String pkg, String logo, String color) {
+        boolean none = (logo == null || logo.trim().isEmpty()) && (color == null || color.trim().isEmpty());
+        put("tile." + pkg, none ? "" : (logo == null ? "" : logo.trim()) + "|" + (color == null ? "" : color.trim()));
+    }
+
     // MARK: - Recommendations
 
     /** What a TMDB watch provider opens: a package, "off", or "" (the built-in match). */

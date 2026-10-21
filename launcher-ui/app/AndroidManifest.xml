@@ -125,6 +125,13 @@
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
             android:theme="@style/CleanYourTV.Home" />
 
+        <!-- launcher-ui/config.sh writes config.json, remote.json and logos here; only the ADB shell may write. -->
+        <provider
+            android:name=".ConfigProvider"
+            android:authorities="io.cleanyourtv.ui.config"
+            android:process=":home"
+            android:exported="true" />
+
         <service
             android:name=".Screensaver"
             android:process=":home"

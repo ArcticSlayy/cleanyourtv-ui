@@ -131,7 +131,14 @@ final class HomeApps {
             Item it = new Item();
             it.kind = APP;
             it.pkg = pkg;
-            if (d == null) {
+            Bitmap custom = CustomTiles.get(pkg) == null ? null : CustomTiles.logo(c, pkg, extract);
+            if (custom != null) {
+                it.key = "custom:" + pkg;
+                it.label = d != null ? d[1] : ri != null ? String.valueOf(ri.loadLabel(pm)) : pkg;
+                it.logo = custom;
+                it.logoInk = ink(custom);
+                it.logoScale = 1;
+            } else if (d == null) {
                 // An app picked in Settings > Shelf that isn't in SHELF: its own name and TV art.
                 it.key = pkg;
                 it.label = ri != null ? String.valueOf(ri.loadLabel(pm)) : pkg;

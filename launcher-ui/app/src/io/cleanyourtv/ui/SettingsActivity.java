@@ -26,6 +26,7 @@ import android.view.View;
 import android.view.accessibility.AccessibilityNodeProvider;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -448,6 +449,10 @@ public class SettingsActivity extends Activity {
                         okDown = false;
                     }
                     return true;
+                case KeyEvent.KEYCODE_MENU:
+                    if (screen != SHELF_EDIT) return false;
+                    if (!down && !shelfRows.isEmpty()) customizeTile(shelfRows.get(pickScroll + focus));
+                    return true;
                 case KeyEvent.KEYCODE_BACK:
                     if (screen == MAIN) return false;   // leaves the settings
                     if (down) {
@@ -712,6 +717,42 @@ public class SettingsActivity extends Activity {
             refreshShelfRows(pkg);
         }
 
+        /** Menu on an app in the shelf editor: its logo (a PNG's URL, or empty for the app's icon) and background color. */
+        private void customizeTile(String[] app) {
+            String[] now = CustomTiles.get(app[0]);
+            LinearLayout form = new LinearLayout(activity);
+            form.setOrientation(LinearLayout.VERTICAL);
+            int pad = Math.round(24 * k);
+            form.setPadding(pad, pad, pad, 0);
+            EditText url = new EditText(activity);
+            url.setSingleLine(true);
+            url.setHint(Ui.tr("URL de um PNG (vazio: ícone do app)", "A PNG's URL (empty: the app's icon)"));
+            url.setText(now == null ? "" : now[0]);
+            EditText color = new EditText(activity);
+            color.setSingleLine(true);
+            color.setHint(Ui.tr("Cor de fundo, ex.: #E53935", "Background color, e.g. #E53935"));
+            color.setText(now == null ? "" : now[1]);
+            form.addView(url);
+            form.addView(color);
+            new AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                    .setTitle(Ui.tr("Logo e cor: ", "Logo and color: ") + app[1])
+                    .setView(form)
+                    .setPositiveButton(Ui.tr("Salvar", "Save"), (d, w) -> {
+                        String hex = color.getText().toString().trim();
+                        if (!hex.isEmpty() && !hex.startsWith("#")) hex = "#" + hex;
+                        try {
+                            if (!hex.isEmpty()) android.graphics.Color.parseColor(hex);
+                        } catch (IllegalArgumentException e) {
+                            android.widget.Toast.makeText(activity, Ui.tr("Cor inválida: use #RRGGBB.", "Invalid color: use #RRGGBB."), android.widget.Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        Prefs.setTile(app[0], url.getText().toString(), hex.isEmpty() ? "#1C1C1E" : hex);
+                    })
+                    .setNeutralButton(Ui.tr("Original", "Original"), (d, w) -> Prefs.setTile(app[0], null, null))
+                    .setNegativeButton(Ui.tr("Cancelar", "Cancel"), null)
+                    .show();
+        }
+
         private void drawShelfEditor(Canvas c) {
             Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
             c.drawText(Ui.tr("Prateleira", "Shelf"), LIST_X * k + 30 * k, (LIST_TOP - 24) * k, heading);
@@ -730,7 +771,7 @@ public class SettingsActivity extends Activity {
             }
             Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
             float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
-            c.drawText(Ui.tr("OK põe ou tira da prateleira (até " + HomeApps.MAX_SHELF + "). ← → mudam a ordem.",
+            c.drawText(Ui.tr("OK põe ou tira (até " + HomeApps.MAX_SHELF + "). ← → mudam a ordem. Menu (≡): logo e cor.",
                     "OK adds or removes (up to " + HomeApps.MAX_SHELF + "). ← → change the order.",
                     "OK pone o quita del estante (hasta " + HomeApps.MAX_SHELF + "). ← → cambian el orden."), LIST_X * k + 30 * k, hy, hint);
         }
