@@ -12,7 +12,6 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
 import org.json.JSONArray;
@@ -44,10 +43,7 @@ public class PersonActivity extends Activity {
         int id = getIntent().getIntExtra(ID, 0);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(TvUi.BG);
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFocusable(false);
-        scroll.setVerticalScrollBarEnabled(false);
-        scroll.setClipChildren(false);
+        TvUi.Scroll scroll = new TvUi.Scroll(this);
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setClipChildren(false);

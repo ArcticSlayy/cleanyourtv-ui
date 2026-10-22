@@ -1,11 +1,16 @@
 package io.cleanyourtv.ui;
 
+import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -16,7 +21,7 @@ import java.net.URL;
 /**
  * A shelf tile the person styled: a logo (a PNG from a URL, a file pushed with launcher-ui/config.sh, or the app's own
  * icon) on a background in their color, drawn like the built-in brands. Set in config.json "app_tiles" or on the TV
- * (Settings > Shelf, Menu button on an app).
+ * (hold OK on a shelf app, or Settings > Shelf and Menu on an app).
  */
 final class CustomTiles {
     private CustomTiles() {}
@@ -112,5 +117,46 @@ final class CustomTiles {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** The logo-and-color form; `saved` runs after Save or Original (null: nothing to refresh). */
+    static void edit(Activity a, String pkg, String label, Runnable saved) {
+        String[] now = get(pkg);
+        float k = TvUi.k(a);
+        LinearLayout form = new LinearLayout(a);
+        form.setOrientation(LinearLayout.VERTICAL);
+        int pad = Math.round(24 * k);
+        form.setPadding(pad, pad, pad, 0);
+        EditText url = new EditText(a);
+        url.setSingleLine(true);
+        url.setHint(Ui.tr("URL de um PNG (vazio: ícone do app)", "A PNG's URL (empty: the app's icon)"));
+        url.setText(now == null ? "" : now[0]);
+        EditText color = new EditText(a);
+        color.setSingleLine(true);
+        color.setHint(Ui.tr("Cor de fundo, ex.: #E53935", "Background color, e.g. #E53935"));
+        color.setText(now == null ? "" : now[1]);
+        form.addView(url);
+        form.addView(color);
+        new AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle(Ui.tr("Logo e cor: ", "Logo and color: ") + label)
+                .setView(form)
+                .setPositiveButton(Ui.tr("Salvar", "Save"), (d, w) -> {
+                    String hex = color.getText().toString().trim();
+                    if (!hex.isEmpty() && !hex.startsWith("#")) hex = "#" + hex;
+                    try {
+                        if (!hex.isEmpty()) Color.parseColor(hex);
+                    } catch (IllegalArgumentException e) {
+                        Toast.makeText(a, Ui.tr("Cor inválida: use #RRGGBB.", "Invalid color: use #RRGGBB."), Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    Prefs.setTile(pkg, url.getText().toString(), hex.isEmpty() ? "#1C1C1E" : hex);
+                    if (saved != null) saved.run();
+                })
+                .setNeutralButton(Ui.tr("Original", "Original"), (d, w) -> {
+                    Prefs.setTile(pkg, null, null);
+                    if (saved != null) saved.run();
+                })
+                .setNegativeButton(Ui.tr("Cancelar", "Cancel"), null)
+                .show();
     }
 }

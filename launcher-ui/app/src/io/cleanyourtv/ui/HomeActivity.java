@@ -19,6 +19,7 @@ public class HomeActivity extends Activity {
         home = new HomeView(this);
         setContentView(home);
         getWindow().setBackgroundDrawable(null);
+        openFrom(getIntent());
     }
 
     @Override protected void onResume() {
@@ -42,6 +43,16 @@ public class HomeActivity extends Activity {
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (home != null) home.reset(true);
+        openFrom(intent);
+    }
+
+    /** `--es open explore|watchlist`: Explore from the computer (adb), as the remote's buttons open it. */
+    private void openFrom(Intent intent) {
+        String what = intent == null ? null : intent.getStringExtra("open");
+        if (what == null) return;
+        intent.removeExtra("open");
+        if (what.equals("explore")) RemoteKeys.run(this, "tmdb:explore");
+        else if (what.equals("watchlist")) RemoteKeys.run(this, "tmdb:watchlist");
     }
 
     @Override protected void onDestroy() {

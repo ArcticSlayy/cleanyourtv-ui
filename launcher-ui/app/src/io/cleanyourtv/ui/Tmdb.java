@@ -90,12 +90,16 @@ final class Tmdb {
     }
 
     static String readAll(InputStream in) throws IOException {
+        return new String(readBytes(in), StandardCharsets.UTF_8);
+    }
+
+    static byte[] readBytes(InputStream in) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         byte[] buf = new byte[16384];
         int n;
         while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
         in.close();
-        return out.toString("UTF-8");
+        return out.toByteArray();
     }
 
     private static final class JSONObjectSafe {
@@ -114,6 +118,7 @@ final class Tmdb {
         final int id;
         final String name, poster, backdrop, year;
         final double vote;
+        String overview = "";
 
         Title(String kind, int id, String name, String poster, String backdrop, String year, double vote) {
             this.kind = kind;
@@ -150,8 +155,10 @@ final class Tmdb {
             String poster = o.optString("poster_path", "");
             if (poster.isEmpty() || "null".equals(poster)) continue;
             String date = o.optString(k.equals("movie") ? "release_date" : "first_air_date", "");
-            out.add(new Title(k, o.optInt("id"), o.optString(k.equals("movie") ? "title" : "name"), poster,
-                    o.optString("backdrop_path", ""), date.length() >= 4 ? date.substring(0, 4) : "", o.optDouble("vote_average", 0)));
+            Title t = new Title(k, o.optInt("id"), o.optString(k.equals("movie") ? "title" : "name"), poster,
+                    o.optString("backdrop_path", ""), date.length() >= 4 ? date.substring(0, 4) : "", o.optDouble("vote_average", 0));
+            t.overview = o.optString("overview", "");
+            out.add(t);
         }
         return out;
     }

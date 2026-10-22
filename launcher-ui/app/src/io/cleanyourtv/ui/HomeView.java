@@ -178,7 +178,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private Spring[] tileSlide = new Spring[0];
     private final Spring moveLift = new Spring(0.3f, 0.72f, 0);
     private List<HomeApps.Item> reorderOrigin;
-    private final Runnable holdStart = () -> { if (this.okDown && this.holdArmed) startReorder(); };
+    private final Runnable holdStart = () -> { if (this.okDown && this.holdArmed) appMenu(); };
 
     // Corner capsule
     private List<HomeApps.Item> statusItems = new ArrayList<>();
@@ -1095,6 +1095,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         wake();
         cancelReorder(true);    // the list changed under the move (an app installed or removed)
         tileShaders = new LinearGradient[0];
+        crispLogos.clear();     // a tile restyled in place keeps its key
         boolean same = list.size() == shelf.size();
         for (int i = 0; same && i < list.size(); i++) same = list.get(i).key.equals(shelf.get(i).key);
         shelf = list;
@@ -1938,17 +1939,17 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             case KeyEvent.KEYCODE_NUMPAD_ENTER:
                 // Opens on release, and only if the press happened here: the release of an OK pressed inside another
                 // app opens nothing.
-                // Held on a shelf app (~0.5 s): move mode. A timer, since not every remote repeats a held key, or the
+                // Held on a shelf app (~0.5 s): its menu (move, logo and color). A timer, since not every remote repeats a held key, or the
                 // long-press repeat, whichever comes first; the release after a hold opens nothing.
                 if (down) {
                     if (e.getRepeatCount() == 0) {
                         okDown = true;
                         okHeld = false;
                         handler.removeCallbacks(holdStart);
-                        holdArmed = canReorder();
+                        holdArmed = canHold();
                         if (holdArmed) handler.postDelayed(holdStart, HOLD_MS);
                     } else if (okDown && holdArmed && e.isLongPress()) {
-                        startReorder();
+                        appMenu();
                     }
                 } else {
                     holdArmed = false;
@@ -2175,6 +2176,34 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         if (sheetOpen || zone != Z_SHELF || shelfIndex >= shelf.size() || shelf.size() < 2) return false;
         HomeApps.Item it = shelf.get(shelfIndex);
         return it.kind == HomeApps.APP && it.pkg != null;
+    }
+
+    private boolean canHold() {
+        if (sheetOpen || zone != Z_SHELF || shelfIndex >= shelf.size()) return false;
+        HomeApps.Item it = shelf.get(shelfIndex);
+        return it.kind == HomeApps.APP && it.pkg != null;
+    }
+
+    /** OK held on a shelf app: Move, Logo and color, or Close, in a small menu over the home screen. */
+    private void appMenu() {
+        handler.removeCallbacks(holdStart);
+        holdArmed = false;
+        if (reordering || !canHold()) return;
+        okHeld = true;      // the release of this press opens nothing
+        HomeApps.Item it = shelf.get(shelfIndex);
+        boolean movable = canReorder();
+        String[] items = movable
+                ? new String[] {Ui.tr("Mover", "Move"), Ui.tr("Logo e cor", "Logo and color"), Ui.tr("Sair", "Close")}
+                : new String[] {Ui.tr("Logo e cor", "Logo and color"), Ui.tr("Sair", "Close")};
+        click.open();
+        new android.app.AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle(it.label)
+                .setItems(items, (d, which) -> {
+                    int choice = movable ? which : which + 1;
+                    if (choice == 0) startReorder();
+                    else if (choice == 1) CustomTiles.edit(activity, it.pkg, it.label, this::reload);
+                })
+                .show();
     }
 
     private void startReorder() {

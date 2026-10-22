@@ -15,7 +15,6 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,9 +45,7 @@ public class SeasonActivity extends Activity {
         season = getIntent().getIntExtra(SEASON, 1);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(TvUi.BG);
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFocusable(false);
-        scroll.setVerticalScrollBarEnabled(false);
+        TvUi.Scroll scroll = new TvUi.Scroll(this);
         list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         list.setPadding(Math.round(140 * k), Math.round(70 * k), Math.round(140 * k), Math.round(80 * k));
@@ -129,8 +126,7 @@ public class SeasonActivity extends Activity {
         row.addView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         Runnable label = () -> title.setText((Tmdb.episodeSeen(this, series, season, number) ? "✓  " : "") + number + ". " + e.optString("name"));
         label.run();
-        row.setFocusable(true);
-        row.setOnFocusChangeListener((v, has) -> v.setBackground(has ? TvUi.round(0x33FFFFFF, 18 * k) : null));
+        TvUi.softFocus(row, k, 18 * k);
         row.setOnClickListener(v -> {
             Tmdb.setEpisodeSeen(this, series, season, number, !Tmdb.episodeSeen(this, series, season, number));
             label.run();
@@ -141,7 +137,7 @@ public class SeasonActivity extends Activity {
             return true;
         });
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.bottomMargin = Math.round(8 * k);
+        lp.bottomMargin = Math.round(14 * k);
         row.setLayoutParams(lp);
         return row;
     }

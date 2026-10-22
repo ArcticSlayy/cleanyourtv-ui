@@ -15,10 +15,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -73,10 +71,7 @@ public class DetailActivity extends Activity {
         View shade = new View(this);
         shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[] {0xF20B0D12, 0xB30B0D12, 0x330B0D12}));
         root.addView(shade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFocusable(false);
-        scroll.setVerticalScrollBarEnabled(false);
-        scroll.setClipChildren(false);
+        TvUi.Scroll scroll = new TvUi.Scroll(this);
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setClipChildren(false);
@@ -86,12 +81,6 @@ public class DetailActivity extends Activity {
         loading.setText(Ui.tr("Carregando…", "Loading…"));
         content.addView(loading);
         scroll.addView(content);
-        scroll.getViewTreeObserver().addOnGlobalFocusChangeListener((was, now) -> {
-            View row = now;
-            while (row != null && row.getParent() != content) row = row.getParent() instanceof View ? (View) row.getParent() : null;
-            if (row != null && content.indexOfChild(row) > 6) scroll.smoothScrollTo(0, Math.max(0, row.getTop() - Math.round(60 * k)));
-            else if (row != null) scroll.smoothScrollTo(0, 0);
-        });
         root.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
         new Thread(() -> {
@@ -195,48 +184,43 @@ public class DetailActivity extends Activity {
                 : o.optJSONObject("watch/providers").optJSONObject("results") == null ? null
                 : o.optJSONObject("watch/providers").optJSONObject("results").optJSONObject(Tmdb.REGION);
         String[] watchApp = firstApp(region);
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setClipChildren(false);
-        actions.setPadding(Math.round(14 * k), Math.round(36 * k), Math.round(60 * k), Math.round(16 * k));
+        TvUi.Flow actions = new TvUi.Flow(this, Math.round(20 * k), Math.round(20 * k));
+        actions.setPadding(Math.round(14 * k), Math.round(36 * k), Math.round(96 * k), Math.round(16 * k));
         if (watchApp != null) {
-            actions.addView(spaced(TvUi.button(this, k, "▶  " + Ui.tr("Assistir em ", "Watch on ") + watchApp[1], v -> watch(watchApp[0]))));
+            actions.addView((TvUi.button(this, k, "▶  " + Ui.tr("Assistir em ", "Watch on ") + watchApp[1], v -> watch(watchApp[0]))));
         }
         listButton = TvUi.button(this, k, "", v -> toggleList());
-        actions.addView(spaced(listButton));
+        actions.addView((listButton));
         seenButton = TvUi.button(this, k, "", v -> toggleSeen());
-        actions.addView(spaced(seenButton));
+        actions.addView((seenButton));
         boolean account = Tmdb.signedIn(this);
         if (account) {
             favButton = TvUi.button(this, k, "", v -> toggleFavorite());
-            actions.addView(spaced(favButton));
+            actions.addView((favButton));
             rateButton = TvUi.button(this, k, "", v -> rate());
-            actions.addView(spaced(rateButton));
-            if (movie) actions.addView(spaced(TvUi.button(this, k, "≡  " + Ui.tr("Lista", "List"), v -> addToList())));
+            actions.addView((rateButton));
+            if (movie) actions.addView((TvUi.button(this, k, "≡  " + Ui.tr("Lista", "List"), v -> addToList())));
         }
         String trailer = trailer(o);
-        if (trailer != null) actions.addView(spaced(TvUi.button(this, k, Ui.tr("Trailer", "Trailer"), v -> playTrailer(trailer))));
-        HorizontalScrollView actionScroll = new HorizontalScrollView(this);
-        actionScroll.setFocusable(false);
-        actionScroll.setHorizontalScrollBarEnabled(false);
-        actionScroll.setClipChildren(false);
-        actionScroll.addView(actions);
-        content.addView(actionScroll);
+        if (trailer != null) actions.addView((TvUi.button(this, k, Ui.tr("Trailer", "Trailer"), v -> playTrailer(trailer))));
+        content.addView(actions, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         labels();
 
         content.addView(header(Ui.tr("Onde assistir", "Where to watch")));
-        content.addView(whereToWatch(region));
+        content.addView(whereToWatch(region), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TvUi.OnTitle open = t -> DetailActivity.open(this, t.kind, t.id);
         if (!movie) {
             List<Tmdb.Title> seasonCards = seasons(o);
             if (!seasonCards.isEmpty()) {
-                content.addView(TvUi.row(this, k, Ui.tr("Temporadas", "Seasons"), seasonCards,
-                        t -> SeasonActivity.open(this, id, t.id, name)));
+                TvUi.OnTitle season = t -> SeasonActivity.open(this, id, t.id, name);
+                content.addView(TvUi.row(this, k, Ui.tr("Temporadas", "Seasons"), seasonCards, season,
+                        () -> GridActivity.show(this, name + " · " + Ui.tr("Temporadas", "Seasons"), seasonCards, season)));
             }
         }
         List<Tmdb.Title> cast = cast(o, movie);
-        if (!cast.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Elenco", "Cast"), cast, open));
+        if (!cast.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Elenco", "Cast"), cast, open,
+                () -> GridActivity.show(this, name + " · " + Ui.tr("Elenco", "Cast"), cast, open)));
         if (collection != null) {
             List<Tmdb.Title> parts = Tmdb.titles(collection, "parts", "movie");
             parts.sort((a, b) -> a.year.compareTo(b.year));
@@ -245,7 +229,7 @@ public class DetailActivity extends Activity {
         View keywords = keywords(o, movie);
         if (keywords != null) {
             content.addView(header(Ui.tr("Palavras-chave", "Keywords")));
-            content.addView(keywords);
+            content.addView(keywords, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
         if (reviews != null && reviews.length() > 0) {
             content.addView(header(Ui.tr("Resenhas", "Reviews")));
@@ -253,7 +237,8 @@ public class DetailActivity extends Activity {
         }
         JSONObject recs = o.optJSONObject("recommendations");
         List<Tmdb.Title> similar = recs == null ? new ArrayList<>() : Tmdb.titles(recs, kind);
-        if (!similar.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Você também pode gostar", "You may also like"), similar, open));
+        if (!similar.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Você também pode gostar", "You may also like"), similar, open,
+                () -> GridActivity.open(this, Ui.tr("Parecidos com ", "Like ") + name, "/" + kind + "/" + id + "/recommendations", kind)));
         View first = actions.getChildAt(0);
         if (first != null) first.requestFocus();
     }
@@ -338,7 +323,7 @@ public class DetailActivity extends Activity {
         List<Tmdb.Title> out = new ArrayList<>();
         JSONObject credits = o.optJSONObject(movie ? "credits" : "aggregate_credits");
         JSONArray list = credits == null ? null : credits.optJSONArray("cast");
-        for (int i = 0; list != null && i < list.length() && out.size() < 20; i++) {
+        for (int i = 0; list != null && i < list.length() && out.size() < 60; i++) {
             JSONObject p = list.optJSONObject(i);
             String face = p.optString("profile_path");
             String role = movie ? p.optString("character") : roles(p);
@@ -357,29 +342,21 @@ public class DetailActivity extends Activity {
         JSONObject kw = o.optJSONObject("keywords");
         JSONArray list = kw == null ? null : kw.optJSONArray(movie ? "keywords" : "results");
         if (list == null || list.length() == 0) return null;
-        LinearLayout line = new LinearLayout(this);
-        line.setOrientation(LinearLayout.HORIZONTAL);
-        line.setClipChildren(false);
-        line.setPadding(Math.round(14 * k), Math.round(14 * k), Math.round(60 * k), Math.round(14 * k));
+        TvUi.Flow line = new TvUi.Flow(this, Math.round(16 * k), Math.round(16 * k));
+        line.setPadding(Math.round(14 * k), Math.round(14 * k), Math.round(96 * k), Math.round(14 * k));
         for (int i = 0; i < list.length() && i < 12; i++) {
             JSONObject w = list.optJSONObject(i);
             String word = w.optString("name");
             int wid = w.optInt("id");
-            line.addView(spaced(TvUi.button(this, k, word, v -> ExploreActivity.openList(this, Ui.tr("Com o tema “", "Tagged “") + word + "”",
-                    "/discover/" + kind + "?with_keywords=" + wid + "&sort_by=popularity.desc", kind))));
+            line.addView(TvUi.button(this, k, word, v -> GridActivity.open(this, Ui.tr("Com o tema “", "Tagged “") + word + "”",
+                    "/discover/" + kind + "?with_keywords=" + wid + "&sort_by=popularity.desc", kind)));
         }
-        HorizontalScrollView scroll = new HorizontalScrollView(this);
-        scroll.setFocusable(false);
-        scroll.setHorizontalScrollBarEnabled(false);
-        scroll.setClipChildren(false);
-        scroll.addView(line);
-        return scroll;
+        return line;
     }
 
     private View review(JSONObject r) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setBackground(TvUi.round(0x1FFFFFFF, 18 * k));
         box.setPadding(Math.round(28 * k), Math.round(22 * k), Math.round(28 * k), Math.round(22 * k));
         JSONObject details = r.optJSONObject("author_details");
         double rating = details == null ? 0 : details.optDouble("rating", 0);
@@ -392,21 +369,13 @@ public class DetailActivity extends Activity {
         body.setPadding(0, Math.round(10 * k), 0, 0);
         box.addView(who);
         box.addView(body);
-        box.setFocusable(true);
-        box.setOnFocusChangeListener((v, has) -> v.setBackground(TvUi.round(has ? 0x40FFFFFF : 0x1FFFFFFF, 18 * k)));
+        TvUi.softFocus(box, k, 18 * k);
         box.setOnClickListener(v -> new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle(r.optString("author")).setMessage(r.optString("content")).setPositiveButton("OK", null).show());
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Math.round(1500 * k), ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.bottomMargin = Math.round(14 * k);
         box.setLayoutParams(lp);
         return box;
-    }
-
-    private View spaced(View v) {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.rightMargin = Math.round(20 * k);
-        v.setLayoutParams(lp);
-        return v;
     }
 
     private TextView header(String text) {
@@ -439,14 +408,8 @@ public class DetailActivity extends Activity {
     }
 
     private View whereToWatch(JSONObject region) {
-        HorizontalScrollView scroll = new HorizontalScrollView(this);
-        scroll.setFocusable(false);
-        scroll.setHorizontalScrollBarEnabled(false);
-        scroll.setClipChildren(false);
-        LinearLayout line = new LinearLayout(this);
-        line.setOrientation(LinearLayout.HORIZONTAL);
-        line.setClipChildren(false);
-        line.setPadding(Math.round(24 * k), Math.round(20 * k), Math.round(80 * k), Math.round(20 * k));
+        TvUi.Flow line = new TvUi.Flow(this, Math.round(18 * k), Math.round(18 * k));
+        line.setPadding(0, Math.round(14 * k), Math.round(96 * k), Math.round(14 * k));
         String[][] types = {{"flatrate", Ui.tr("Assinatura", "Subscription")}, {"free", Ui.tr("Grátis", "Free")},
                 {"ads", Ui.tr("Grátis com anúncios", "Free with ads")}, {"rent", Ui.tr("Aluguel", "Rent")}, {"buy", Ui.tr("Compra", "Buy")}};
         Set<String> added = new HashSet<>();
@@ -464,8 +427,7 @@ public class DetailActivity extends Activity {
             none.setText(Ui.tr("Não está em nenhum serviço de streaming no Brasil agora.", "Not on any streaming service in the region right now."));
             return none;
         }
-        scroll.addView(line);
-        return scroll;
+        return line;
     }
 
     private View chip(int pid, String name, String logo, String type) {
@@ -473,8 +435,7 @@ public class DetailActivity extends Activity {
         LinearLayout chip = new LinearLayout(this);
         chip.setOrientation(LinearLayout.HORIZONTAL);
         chip.setGravity(Gravity.CENTER_VERTICAL);
-        chip.setBackground(TvUi.round(0x26FFFFFF, 18 * k));
-        chip.setPadding(Math.round(14 * k), Math.round(14 * k), Math.round(28 * k), Math.round(14 * k));
+        chip.setPadding(Math.round(16 * k), Math.round(16 * k), Math.round(30 * k), Math.round(16 * k));
         ImageView img = new ImageView(this);
         img.setClipToOutline(true);
         img.setBackground(TvUi.round(0x00000000, 12 * k));
@@ -492,15 +453,12 @@ public class DetailActivity extends Activity {
         texts.addView(n);
         texts.addView(s);
         chip.addView(texts);
-        TvUi.focusable(chip, k, 18 * k);
+        TvUi.softFocus(chip, k, 18 * k);
         chip.setOnClickListener(v -> {
             if (app != null) watch(app);
             else Toast.makeText(this, Ui.tr("Nenhum app para " + name + ". Escolha um em Ajustes › Serviços.",
                     "No app for " + name + ". Pick one in Settings › Services."), Toast.LENGTH_LONG).show();
         });
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.rightMargin = Math.round(20 * k);
-        chip.setLayoutParams(lp);
         return chip;
     }
 
@@ -617,14 +575,16 @@ public class DetailActivity extends Activity {
         return null;
     }
 
+    /** YouTube for TV in its own task (started as part of ours, it closes as soon as the video opens). */
     private void playTrailer(String key) {
         Intent youtube = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=" + key))
-                .setPackage("com.google.android.youtube.tv");
+                .setPackage("com.google.android.youtube.tv")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         try {
             startActivity(youtube);
         } catch (Exception e) {
             try {
-                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=" + key)));
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=" + key)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             } catch (Exception ignored) {
                 Toast.makeText(this, Ui.tr("O YouTube não está instalado.", "YouTube isn't installed."), Toast.LENGTH_SHORT).show();
             }
