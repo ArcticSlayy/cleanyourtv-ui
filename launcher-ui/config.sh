@@ -5,6 +5,8 @@
 # Usage: TV_HOST=192.168.1.50 launcher-ui/config.sh my-config.json
 #        TV_HOST=192.168.1.50 launcher-ui/config.sh --remote examples/tcl-55c725/remote.json
 #        TV_HOST=192.168.1.50 launcher-ui/config.sh --file tomato.png      # a logo for config.json "app_tiles"
+#        TV_HOST=192.168.1.50 launcher-ui/config.sh --theme themes/aurora [my-config.json]   # a CleanYourTV theme's
+#            apps, hidden apps and remote buttons (launcher-ui/theme.py), over your config.json if given
 #        TV_HOST=192.168.1.50 launcher-ui/config.sh --reset        # removes both files from the TV
 set -euo pipefail
 : "${TV_HOST:?set TV_HOST to the TV IP address}"
@@ -22,9 +24,17 @@ case "${1:-}" in
     tv "content delete --uri $URI/config.json; content delete --uri $URI/remote.json; input keyevent KEYCODE_HOME; echo reset" | tail -n 1
     exit 0 ;;
   --remote) NAME=remote.json; FILE="${2:?usage: config.sh --remote <remote.json>}" ;;
+  --theme)
+    THEME="${2:?usage: config.sh --theme <theme folder> [base config.json]}"
+    case "$THEME" in /*) ;; *) THEME="$ARG_DIR/$THEME" ;; esac
+    BASE="${3:-}"
+    if [ -n "$BASE" ]; then case "$BASE" in /*) ;; *) BASE="$ARG_DIR/$BASE" ;; esac; fi
+    NAME=config.json
+    FILE="$(mktemp -t cyt-ui-theme).json"
+    "$PY" -I "$(pwd)/theme.py" "$THEME" ${BASE:+"$BASE"} > "$FILE" ;;
   --file) FILE="${2:?usage: config.sh --file <logo.png>}"; NAME=$(basename "$FILE")
     [[ "$NAME" =~ ^[A-Za-z0-9_.-]+\.(png|PNG)$ ]] || { echo "logo files are PNGs named with letters, digits, . _ -" >&2; exit 1; } ;;
-  "") echo "usage: config.sh <config.json> | --remote <remote.json> | --reset" >&2; exit 1 ;;
+  "") echo "usage: config.sh <config.json> | --remote <remote.json> | --theme <folder> [config.json] | --file <logo.png> | --reset" >&2; exit 1 ;;
   *) NAME=config.json; FILE="$1" ;;
 esac
 case "$FILE" in /*) ;; *) FILE="$ARG_DIR/$FILE" ;; esac

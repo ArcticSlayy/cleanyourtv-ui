@@ -1,132 +1,135 @@
 # CleanYourTV UI
 
-Uma tela inicial para Android TV com cara de Apple TV, em cima do **[CleanYourTV](https://github.com/Gathin23/cleanyourtv)**
-(que tira o lixo de fábrica da TV) e com o visual do **[Free My TV](https://github.com/simbasjungles/free-my-tv)**.
-Em português primeiro. Explorar filmes e séries com o TMDB, ver onde cada um passa e abrir direto no app.
+**English** · [Português](README.pt-BR.md)
 
-![Tela inicial](docs/ui/screenshots/home.jpg)
+An Apple TV-style home screen for Android TV, built on **[CleanYourTV](https://github.com/Gathin23/cleanyourtv)**
+(which strips the factory bloat off your TV) with the look of **[Free My TV](https://github.com/simbasjungles/free-my-tv)**.
+Browse movies and shows with TMDB, see where each one streams, and open it right in the app.
 
-Este repositório é um **fork do CleanYourTV**: tudo o que o original tem continua aqui, igual (listas de debloat por
-modelo em `examples/`, os scripts em `tools/`, o launcher mínimo em `launcher/`). O README do CleanYourTV está em
-**[`README.cleanyourtv.md`](README.cleanyourtv.md)**, atualizado junto com o resto.
-O fork só **acrescenta** arquivos, e um workflow traz as novidades do CleanYourTV todo dia
-([`sync-upstream.yml`](.github/workflows/sync-upstream.yml)).
+![Home screen](docs/ui/screenshots/en/home.jpg)
 
-## Qual a diferença
+This repository is a **fork of CleanYourTV**: everything the original has is still here, unchanged (the per-model
+debloat lists in `examples/`, the scripts in `tools/`, the minimal launcher in `launcher/`). CleanYourTV's README is
+**[`README.cleanyourtv.md`](README.cleanyourtv.md)**, kept current with the rest. The fork only **adds** files, and
+a workflow brings in CleanYourTV's changes every day ([`sync-upstream.yml`](.github/workflows/sync-upstream.yml)).
 
-| | [CleanYourTV](https://github.com/Gathin23/cleanyourtv) | [Free My TV](https://github.com/simbasjungles/free-my-tv) | **CleanYourTV UI** (este) |
+## How it differs
+
+| | [CleanYourTV](https://github.com/Gathin23/cleanyourtv) | [Free My TV](https://github.com/simbasjungles/free-my-tv) | **CleanYourTV UI** (this) |
 |---|---|---|---|
-| O que é | Debloat por modelo + um launcher mínimo | Uma tela inicial bonita para TVs | O CleanYourTV inteiro + uma tela inicial no estilo do Free My TV |
-| Debloat da TV | Listas por modelo, com backup e volta | — | O do CleanYourTV, sem mudanças |
-| Tela inicial | Dock e grade, sem internet | Prateleira de vidro, sugestões, clima | A do Free My TV, adaptada, mais o **Explorar** |
-| ADB ligado depois de instalar | Não precisa | Usa ADB da própria TV para manter a Home | Não precisa: tudo é feito pelo computador uma vez |
-| Explorar filmes e séries | — | Sugestões na tela inicial | Banner, catálogos, Top 10, categorias com filtro, busca, página de cada título, elenco, temporadas |
-| Conta TMDB | — | — | Login por QR code: minha lista, favoritos, notas, listas |
-| "Assistir em…" | — | Abre o app | Abre **o título** no app (Netflix, Disney+, Apple TV, Max, Prime) quando o Wikidata sabe o ID |
-| Botões do controle | `app_keys` no tema | — | Um `remote.json` por modelo + tela de ajustes na TV |
-| Configuração | `config.json` do tema | Ajustes na TV | `config.json` enviado pelo computador + ajustes na TV |
-| Idioma | Inglês | Vários idiomas | Português primeiro |
-| Custo para um assistente de IA adaptar | Baixo | Médio | **Maior**: mais código, rede e telas, mais tokens |
+| What it is | Per-model debloat + a minimal launcher | A good-looking home screen for TVs | All of CleanYourTV + a home screen in Free My TV's style |
+| TV debloat | Per-model lists, with backup and restore | — | CleanYourTV's, unchanged |
+| Home screen | Dock and grid, offline | Glass shelf, picks, weather | Free My TV's, adapted, plus **Explore** |
+| ADB on after install | Not needed | Uses the TV's own ADB to keep Home | Not needed: everything is done once from the computer |
+| Browse movies and shows | — | Picks on the home screen | Banner, catalogs, top 10, categories with filters, search, title pages, cast, seasons |
+| TMDB account | — | — | QR code sign-in: watchlist, favorites, ratings, lists |
+| "Watch on…" | — | Opens the app | Opens **the title** in the app (Netflix, Disney+, Apple TV, Max, Prime) when Wikidata knows its id |
+| Remote buttons | `app_keys` in a theme | — | A `remote.json` per model + a settings screen on the TV |
+| Configuration | The theme's `config.json` | Settings on the TV | A `config.json` pushed from the computer + settings on the TV |
+| Language | English | Several | English and Portuguese, plus Spanish, German and Russian; follows the TV |
+| Cost for an AI assistant to adapt | Low | Medium | **Higher**: more code, network and screens, more tokens |
 
-Quer só uma TV limpa e uma tela mínima? Use o `launcher/` do CleanYourTV. Quer a tela inicial sem o debloat? Use o
-Free My TV. Este projeto é para quem quer os dois e um Explorar completo.
+Just want a clean TV and a minimal home? Use CleanYourTV's `launcher/`. Want the home screen without the debloat? Use
+Free My TV. This project is for people who want both and a full Explore.
 
-## Funcionalidades
+## Features
 
-**Tela inicial**
-- "Para você" com sugestões do TMDB nos seus serviços, abas Explorar, Filmes e Séries.
-- Prateleira de apps com logos oficiais; segurar OK num app abre um menu a partir do card: mover, logo e cor
-  (URL de um PNG e cor de fundo, ou pelo `config.json`), configurações do app no Android (parar, limpar cache) e sair.
-- Clima da sua cidade, tema que escurece com o pôr do sol, screensaver com fotos.
-- Funciona sem ADB ligado: debloat, troca da Home e o serviço dos botões são feitos uma vez pelo computador.
+**Home screen**
+- "For You" with TMDB picks on your services, and Explore, Movies and Shows tabs.
+- An app shelf with official logos; holding OK on an app drops a menu from its card: move, logo and color (a PNG's URL
+  and a background color, or through `config.json`), the app's Android settings (force stop, clear cache) and close.
+- Weather for your city, a theme that darkens at sunset, a photo screensaver.
+- No ADB left on: debloat, the Home switch and the remote-button service are done once from the computer.
 
-**Explorar** (o botão ▶ da tela inicial ou um botão do controle)
-- Banner como o do Apple TV, com a logo do título; a imagem se mistura ao fundo, que acompanha o pôster focado.
-- Fileiras de até 10 títulos com "Ver mais", que abre a lista inteira em grade, carregada conforme você desce.
-- Menu lateral (seta para a esquerda na borda): Explorar e ajustes, Buscar, Início, Minha lista, e o resto na ordem
-  que você quiser, podendo ocultar: Top 10 do dia, Filmes, Séries, Infantil, Animes, Categorias, filtros salvos e uma
-  página por serviço de streaming que você tem na TV.
-- Filmes, Séries, Infantil e Animes como catálogos: abas de tipo em cima, grade de pôsteres embaixo.
-- Busca e Categorias com o mesmo filtro: tipo, uma ou mais categorias (incluindo Anime, Doramas, Nacionais) e ano;
-  categorias podem ser salvas no menu. Buscas recentes.
-- Minha lista em abas: lista, favoritos, já assisti, suas notas.
-- Títulos já vistos com ✓ na capa; títulos longos rolam como letreiro no card focado.
-- Página do título: classificação, direção, onde assistir no Brasil, minha lista, já assisti, favoritar, nota,
-  listas, trailer, temporadas e episódios, elenco (com a página de cada pessoa), coleção, palavras-chave e resenhas.
-- Rápido e leve: respostas do TMDB em cache no disco (listas por 3 h, títulos por 12 h, fotos e pessoas por uma
-  semana; sem internet, usa a cópia antiga) e imagens também (até 160 MB, uma semana). Quando você abre um app ou
-  a TV, o launcher solta o que guardava na memória: numa TCL de 2 GB, cerca de 66 MB em segundo plano, contra
-  ~155 MB antes.
-- Sem anúncios e sem telemetria: só fala com o TMDB, o Wikidata (IDs dos serviços) e o Open-Meteo (clima).
+**Explore** (the ▶ button on the home screen, or a remote button)
+- An Apple TV-like banner with the title's logo; its picture melts into the background, which follows the focused poster.
+- Rows of up to 10 titles with "See more", which opens the whole list as a grid that loads as you scroll.
+- A side menu (Left at the screen's edge): Explore and its settings, Search, Home, My list, then the rest in the order you
+  like, each one hideable: Today's top 10, Movies, Shows, Kids, Anime, Categories, saved filters, and one page per
+  streaming service on the TV.
+- Movies, Shows, Kids and Anime as catalogs: tabs on top, a poster grid below.
+- Search and Categories share one filter: type, one or more categories (Anime, K-dramas and Brazilian included) and
+  release year; a category filter can be saved to the menu. Recent searches.
+- My list as tabs: watchlist, favorites, seen, your ratings.
+- Seen titles get a ✓ on the poster; long titles scroll like a ticker on the focused card.
+- Title pages: rating and age rating, director, where to stream in your region, watchlist, seen, favorite, rate, lists,
+  trailer, seasons and episodes, cast (each person with their page), collection, keywords and reviews.
+- Fast and light: TMDB answers cached on disk (lists for 3 h, titles for 12 h, pictures and people for a week; an old
+  copy when offline) and images too (up to 160 MB, a week). When an app or the TV is on, the launcher lets go of what it
+  kept in memory: on a 2 GB TCL, about 66 MB in the background, down from ~155 MB.
+- No ads and no telemetry: it only talks to TMDB, Wikidata (the services' ids) and Open-Meteo (weather).
 
-**Controle e configuração**
-- `examples/<modelo>/remote.json` diz quais botões do controle podem ser trocados; na TV, cada um abre um app, uma
-  entrada HDMI, o Explorar ou a sua lista.
-- `launcher-ui/config.sh` envia um `config.json` (prateleira, apps ocultos, cidade, botões, serviços, logos) pelo
-  ADB, sem compilar de novo. Só o shell do ADB pode escrever essa configuração no app.
+**Remote and configuration**
+- `examples/<model>/remote.json` says which remote buttons can be changed; on the TV each one opens an app, an HDMI
+  input, Explore or your list.
+- `launcher-ui/config.sh` pushes a `config.json` (shelf, hidden apps, city, buttons, services, logos) over ADB, without
+  rebuilding. Only the ADB shell can write that configuration into the app.
+- CleanYourTV themes: `launcher-ui/config.sh --theme themes/<name> [my-config.json]` takes what both launchers share
+  (a theme's dock apps become the shelf, plus hidden apps and remote buttons). The rest of a theme (wallpaper, columns,
+  glass) belongs to the original launcher: here the background comes from the picks' photos.
 
-## Prints
+## Screenshots
 
 | | |
 |---|---|
-| ![Explorar](docs/ui/screenshots/explore.jpg) | ![Menu do Explorar](docs/ui/screenshots/explore-menu.jpg) |
-| ![Catálogo Infantil](docs/ui/screenshots/explore-kids.jpg) | ![Top 10 do dia](docs/ui/screenshots/explore-top10.jpg) |
-| ![Filtros](docs/ui/screenshots/explore-filters.jpg) | ![Categorias filtradas](docs/ui/screenshots/explore-categories.jpg) |
-| ![Página do título](docs/ui/screenshots/title.jpg) | ![Menu de um app na tela inicial](docs/ui/screenshots/home-app-menu.jpg) |
+| ![Explore](docs/ui/screenshots/en/explore.jpg) | ![Explore's menu](docs/ui/screenshots/en/explore-menu.jpg) |
+| ![Anime catalog](docs/ui/screenshots/en/explore-anime.jpg) | ![Today's top 10](docs/ui/screenshots/en/explore-top10.jpg) |
+| ![Filters](docs/ui/screenshots/en/explore-filters.jpg) | ![Top 10 movies](docs/ui/screenshots/en/explore-top10-grid.jpg) |
+| ![Title page](docs/ui/screenshots/en/title.jpg) | ![An app's menu on the home screen](docs/ui/screenshots/home-app-menu.jpg) |
 
 ## Quick start
 
-Você precisa de um computador no mesmo Wi-Fi da TV e de um assistente de código com acesso ao terminal (Claude
-Code, Codex ou Gemini CLI), como no CleanYourTV.
+You need a computer on the same Wi-Fi as the TV and a coding assistant with shell access (Claude Code, Codex or
+Gemini CLI), as with CleanYourTV.
 
-| Onde | O que fazer |
+| Where | What to do |
 |---|---|
-| **1. Na TV** | Configurações → Preferências do dispositivo → Sobre → aperte OK em **Build** sete vezes → volte → Opções do desenvolvedor → **Depuração USB** ligada (e **Depuração por rede/ADB**, se houver). Deixe a TV ligada. |
-| **2. No computador** | Cole o [`PROMPT.md`](PROMPT.md) no assistente com o modelo da sua TV e peça a tela inicial do `launcher-ui/` (este fork) no lugar do `launcher/`. |
-| **3. Acompanhe** | Aceite "Permitir depuração USB?" na TV e responda o checklist: apps que você usa, ordem da prateleira, assistente de voz, Chromecast e atualizações. |
+| **1. On the TV** | Settings → Device Preferences → About → press OK on **Build** seven times → back → Developer options → **USB debugging** on (and **Network/ADB debugging** if there is one). Keep the TV on. |
+| **2. On your computer** | Paste [`PROMPT.md`](PROMPT.md) into your assistant with your TV model, and ask for this fork's home screen in `launcher-ui/` instead of `launcher/`. |
+| **3. Follow along** | Accept "Allow USB debugging?" on the TV and answer the checklist: the apps you use, the shelf order, the voice assistant, Chromecast and updates. |
 
-O assistente faz backup, o debloat, compila e instala a tela inicial e confere cada passo com prints da TV.
-Detalhes do debloat, dos modelos suportados e de como voltar estão no [README do CleanYourTV](README.cleanyourtv.md).
+The assistant backs up, debloats, builds and installs the home screen, and checks each step with screenshots from the
+TV. The debloat, the supported TVs and how to go back are in [CleanYourTV's README](README.cleanyourtv.md).
 
-## Instalar à mão
+## Installing by hand
 
-1. Siga o [Quick start do CleanYourTV](README.cleanyourtv.md#quick-start) até aplicar a lista de debloat da sua TV.
-2. Crie a configuração e coloque sua chave do TMDB (grátis, em themoviedb.org → Settings → API) e sua cidade:
+1. Follow [CleanYourTV's Quick start](README.cleanyourtv.md#quick-start) up to applying your TV's debloat list.
+2. Create the settings with your TMDB key (free, at themoviedb.org → Settings → API) and your city:
    ```bash
    cp launcher-ui/config.example.properties launcher-ui/config.properties
    ```
-   `config.properties` fica fora do git. A chave é do app e continua necessária mesmo com o login por QR code: o
-   login só diz ao TMDB quem é você, para a sua lista e as suas notas.
-3. Compile e instale (JDK 17 e Android SDK com build-tools 34+ e a platform android-34; sem Gradle):
+   `config.properties` stays out of git. The key belongs to the app and is still needed with the QR sign-in: signing in
+   only tells TMDB who you are, for your list and ratings. `language=auto` follows the TV's language.
+3. Build and install (JDK 17 and the Android SDK with build-tools 34+ and platform android-34; no Gradle):
    ```bash
    TV_HOST=192.168.1.50 KEY_SERVICE=1 launcher-ui/build-and-install.sh
    ```
-   `KEY_SERVICE=1` liga o serviço dos botões do controle (passe de novo a cada reinstalação). `SCREENSAVER=0`
-   mantém o screensaver atual.
-4. Opcional: `TV_HOST=… launcher-ui/config.sh meu-config.json` (veja `launcher-ui/config.example.json`) e
-   `launcher-ui/config.sh --remote examples/<modelo>/remote.json`.
+   `KEY_SERVICE=1` turns on the remote-button service (pass it again on every reinstall). `SCREENSAVER=0` keeps the
+   current screensaver.
+4. Optional: `TV_HOST=… launcher-ui/config.sh my-config.json` (see `launcher-ui/config.example.json`) and
+   `launcher-ui/config.sh --remote examples/<model>/remote.json`.
 
-O script tem as proteções do original: confere o Android antes de compilar, inicia a Home nova antes de mexer na
-antiga e desfaz a troca se ela não pegar. Para abrir o Explorar pelo computador:
-`adb shell am start -n io.cleanyourtv.ui/.HomeActivity --es open explore` (ou `--es open watchlist`).
+The script keeps the original's safeguards: it checks Android before building, starts the new Home before touching the
+old one, and undoes the switch if it doesn't take. To open Explore from the computer:
+`adb shell am start -n io.cleanyourtv.ui/.HomeActivity --es open explore` (or `--es open watchlist`).
 
-## Voltar
+## Going back
 
-- Para o launcher do CleanYourTV: instale o `launcher/` como no README original.
-- Para a TV de fábrica: `tools/restore.sh`, como no [README do CleanYourTV](README.cleanyourtv.md#restoring-your-tv).
+- To CleanYourTV's launcher: install `launcher/` as in its README.
+- To the factory TV: `tools/restore.sh`, as in [CleanYourTV's README](README.cleanyourtv.md#restoring-your-tv).
 
-## Atualizações do CleanYourTV
+## CleanYourTV updates
 
-O workflow [`sync-upstream.yml`](.github/workflows/sync-upstream.yml) roda todo dia e faz o merge do `main` do CleanYourTV.
-Este fork não altera os arquivos do original, com uma exceção: o `README.md` é este. A cada atualização o workflow
-copia o README novo do CleanYourTV para [`README.cleanyourtv.md`](README.cleanyourtv.md) e mantém este. Qualquer outro
-conflito vira uma issue com os comandos para resolver à mão.
+The [`sync-upstream.yml`](.github/workflows/sync-upstream.yml) workflow runs every day and merges CleanYourTV's `main`.
+This fork leaves the original's files alone, with one exception: `README.md` is this fork's. On every sync the workflow
+copies CleanYourTV's new README to [`README.cleanyourtv.md`](README.cleanyourtv.md) and keeps this fork's. Any other
+conflict becomes an issue with the commands to solve it by hand.
 
-## Créditos e contato
+## Credits and contact
 
-- [CleanYourTV](https://github.com/Gathin23/cleanyourtv), de Gathin, e [Free My TV](https://github.com/simbasjungles/free-my-tv),
-  dos seus autores, ambos sob a licença MIT. Detalhes em [`launcher-ui/NOTICE`](launcher-ui/NOTICE).
-- Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB. IDs dos serviços pelo Wikidata.
-  Clima por Open-Meteo.com.
-- Matheus Caldeira, [github.com/matheus-caldeira](https://github.com/matheus-caldeira). Dúvidas e problemas nas
+- [CleanYourTV](https://github.com/Gathin23/cleanyourtv), by Gathin, and [Free My TV](https://github.com/simbasjungles/free-my-tv),
+  by its authors, both under the MIT License. Details in [`launcher-ui/NOTICE`](launcher-ui/NOTICE).
+- This product uses the TMDB API but is not endorsed or certified by TMDB. Service ids from Wikidata. Weather by
+  Open-Meteo.com.
+- Matheus Caldeira, [github.com/matheus-caldeira](https://github.com/matheus-caldeira). Questions and problems in the
   [issues](https://github.com/matheus-caldeira/cleanyourtv-ui/issues).

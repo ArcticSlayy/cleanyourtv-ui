@@ -48,7 +48,7 @@ jobs:
           # README.md is ours; upstream's goes to README.cleanyourtv.md.
           git checkout --ours README.md 2>/dev/null || git checkout HEAD -- README.md
           {
-            echo '> **CleanYourTV UI:** este é o README do [CleanYourTV](https://github.com/Gathin23/cleanyourtv), copiado a cada atualização. O deste fork é o [README.md](README.md).'
+            echo "> **CleanYourTV UI:** this is [CleanYourTV](https://github.com/Gathin23/cleanyourtv)'s README, copied on every sync. This fork's is [README.md](README.md) ([Português](README.pt-BR.md))."
             echo
             git show upstream/main:README.md
           } > README.cleanyourtv.md

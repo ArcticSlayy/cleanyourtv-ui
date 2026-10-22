@@ -52,8 +52,15 @@ final class Tmdb {
 
     static boolean hasKey() { return !Config.TMDB_KEY.trim().isEmpty(); }
 
+    /** TMDB's language for the app's: titles, overviews and logos in it when TMDB has them. */
     static String lang() {
-        return "pt".equals(Ui.language) ? "pt-BR" : Ui.language;
+        switch (Ui.language) {
+            case "pt": return "pt-BR";
+            case "es": return "es-ES";
+            case "de": return "de-DE";
+            case "ru": return "ru-RU";
+            default: return "en-US";
+        }
     }
 
     /**

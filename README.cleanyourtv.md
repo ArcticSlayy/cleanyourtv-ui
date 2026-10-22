@@ -1,4 +1,4 @@
-> **CleanYourTV UI:** este é o README do [CleanYourTV](https://github.com/Gathin23/cleanyourtv), copiado a cada atualização. O deste fork é o [README.md](README.md).
+> **CleanYourTV UI:** this is [CleanYourTV](https://github.com/Gathin23/cleanyourtv)'s README, copied on every sync. This fork's is [README.md](README.md) ([Português](README.pt-BR.md)).
 
 <p align="center">
   <a href="https://cleanyour.tv"><img src="https://raw.githubusercontent.com/Gathin23/cleanyourtv/main/docs/banner.png" alt="CleanYourTV. Your TV, minus the ads. Strip the bloatware from any Android TV or Google TV over Wi-Fi and replace the ad-filled home screen with a clean launcher that looks like an Apple TV. No root, no cable, nothing uninstalled, and a one-line restore." width="800"></a>
