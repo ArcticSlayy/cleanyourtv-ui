@@ -13,9 +13,22 @@ if [ -z "$SDK" ]; then
   done
 fi
 [ -n "$SDK" ] && [ -d "$SDK/build-tools" ] || { echo "Android SDK not found. Install it and set ANDROID_HOME (see README)."; exit 1; }
+# javac, d8 and apksigner are native Windows programs even when this runs under git-bash/MSYS, and they
+# cannot read an MSYS '/c/Users/...' path: javac then fails with "Unable to find package java.lang in
+# platform classes" and the bootclasspath separator never gets a chance to matter. Ask the shell for the
+# Windows form when it can give one (the same pwd -W idiom tools/disable.sh uses).
+SDK="$(cd "$SDK" && { pwd -W 2>/dev/null || pwd; })"
 BT="$SDK/build-tools/$(ls "$SDK/build-tools" | sort -V | tail -1)"
 AJ="$(ls -d "$SDK"/platforms/android-*/android.jar 2>/dev/null | sort -V | tail -1 || true)"
 [ -f "${AJ:-}" ] || { echo "Android platform not found. Run: sdkmanager \"platforms;android-34\""; exit 1; }
+# classes.dex is added to the APK with a zip writer. zip(1) stays the first choice, so a Unix/macOS box
+# keeps building exactly as before; git-bash/MSYS on Windows has no zip(1), so fall back to Python's
+# zipfile in append mode, which leaves aapt2's existing entry order untouched.
+ZIPPY="${PYTHON:-}"
+if [ -z "$ZIPPY" ]; then ZIPPY="$(command -v python3 || command -v python || true)"; fi
+if ! command -v zip >/dev/null 2>&1 && [ -z "$ZIPPY" ]; then
+  echo "No zip(1) and no Python 3 to pack classes.dex. Install either (or set PYTHON)."; exit 1
+fi
 JAVAC="${JAVA_HOME:+$JAVA_HOME/bin/}javac"
 KEYTOOL="${JAVA_HOME:+$JAVA_HOME/bin/}keytool"
 command -v "$JAVAC" >/dev/null 2>&1 || { echo "JDK not found. Install JDK 17 and set JAVA_HOME."; exit 1; }
@@ -109,10 +122,34 @@ EOF
     "${JAVA_HOME:+$JAVA_HOME/bin/}java" out/FixAssets.java out/base.apk
     ;;
 esac
-"$JAVAC" -nowarn -Xlint:-options -source 8 -target 8 -bootclasspath "$AJ:$BT/core-lambda-stubs.jar" -classpath "$AJ" \
+# The bootclasspath is a two-entry list, and the separator is platform-specific: Windows javac wants
+# ';' where Unix wants ':'. With the wrong one javac reads the whole thing as a single missing path
+# and every lambda in the sources fails with "Unable to find method metafactory" (LambdaMetafactory
+# lives in core-lambda-stubs.jar, not in android.jar). MSYS/Cygwin run the Windows javac, so they
+# need ';' too.
+CP_SEP=":"
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) CP_SEP=";";; esac
+"$JAVAC" -nowarn -Xlint:-options -source 8 -target 8 -bootclasspath "$AJ${CP_SEP}$BT/core-lambda-stubs.jar" -classpath "$AJ" \
   -encoding UTF-8 -d out/classes $(find app/src out/gen -name '*.java')
-"$BT/d8" --release --min-api 28 --lib "$AJ" --output out $(find out/classes -name '*.class')
-(cd out && zip -qj base.apk classes.dex)
+# d8 and apksigner ship as .bat wrappers on Windows and extensionless ones on Unix; aapt2 and
+# zipalign are .exe there. Resolve each tool by what the SDK actually contains.
+tool() {
+  local n="$1" c
+  for c in "$BT/$n" "$BT/$n.exe" "$BT/$n.bat"; do
+    if [ -f "$c" ]; then printf '%s' "$c"; return; fi
+  done
+  printf '%s' "$BT/$n"
+}
+D8="$(tool d8)"
+APKSIGNER="$(tool apksigner)"
+"$D8" --release --min-api 28 --lib "$AJ" --output out $(find out/classes -name '*.class')
+if command -v zip >/dev/null 2>&1; then
+  (cd out && zip -qj base.apk classes.dex)
+else
+  # Python <3.7 ignores the ZipFile compression argument for write() and stores the entry instead;
+  # Android reads either, so that is a size difference and nothing more.
+  (cd out && "$ZIPPY" -c "import zipfile; z=zipfile.ZipFile('base.apk','a',zipfile.ZIP_DEFLATED); z.write('classes.dex','classes.dex'); z.close()")
+fi
 "$BT/zipalign" -f -p 4 out/base.apk out/aligned.apk
 
 # --- Sign with your own key (created once; updates need the same key, so keep cleanyourtv-ui.keystore)
@@ -120,5 +157,5 @@ if [ ! -f cleanyourtv-ui.keystore ]; then
   "$KEYTOOL" -genkeypair -keystore cleanyourtv-ui.keystore -alias cleanyourtv-ui -keyalg RSA -keysize 2048 -validity 20000 \
     -storepass cleanyourtv-ui -keypass cleanyourtv-ui -dname "CN=CleanYourTV UI" >/dev/null 2>&1
 fi
-"$BT/apksigner" sign --ks cleanyourtv-ui.keystore --ks-pass pass:cleanyourtv-ui --key-pass pass:cleanyourtv-ui --out CleanYourTV-UI.apk out/aligned.apk
+"$APKSIGNER" sign --ks cleanyourtv-ui.keystore --ks-pass pass:cleanyourtv-ui --key-pass pass:cleanyourtv-ui --out CleanYourTV-UI.apk out/aligned.apk
 echo "Built CleanYourTV-UI.apk ($(du -h CleanYourTV-UI.apk | cut -f1)). Install: adb install -r CleanYourTV-UI.apk"
