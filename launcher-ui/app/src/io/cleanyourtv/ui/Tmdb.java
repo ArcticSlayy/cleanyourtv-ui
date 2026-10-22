@@ -315,7 +315,21 @@ final class Tmdb {
         if (on) all.add(key); else all.remove(key);
         sp(c).edit().putStringSet("episodes", all).apply();
     }
-    static boolean isSeen(Context c, String kind, int id) { return localHas(c, "seen", kind + ":" + id); }
+    private static String seenRaw;
+    private static final java.util.Set<String> SEEN = new java.util.HashSet<>();
+
+    /** Asked for every poster: the list is parsed again only when it changed. */
+    static boolean isSeen(Context c, String kind, int id) {
+        String raw = sp(c).getString("seen", "[]");
+        synchronized (SEEN) {
+            if (!raw.equals(seenRaw)) {
+                SEEN.clear();
+                for (Title t : local(c, "seen")) SEEN.add(t.key());
+                seenRaw = raw;
+            }
+            return SEEN.contains(kind + ":" + id);
+        }
+    }
     static void setSeen(Context c, Title t, boolean on) { localSet(c, "seen", t, on); }
 
     private static List<Title> local(Context c, String list) {

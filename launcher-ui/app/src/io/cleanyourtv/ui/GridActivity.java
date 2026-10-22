@@ -92,9 +92,7 @@ public class GridActivity extends Activity {
         }
         content.addView(grid);
         scroll.addView(content);
-        scroll.getViewTreeObserver().addOnGlobalFocusChangeListener((was, now) -> {
-            if (path != null && now != null && grid.lineOf(now) >= grid.getChildCount() - 2) more();
-        });
+        if (path != null) grid.needMore = this::more;
         root.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
         if (path == null) grid.post(() -> { if (grid.getChildCount() > 0) grid.getChildAt(0).requestFocus(); });

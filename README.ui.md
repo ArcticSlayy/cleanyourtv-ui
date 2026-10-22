@@ -22,13 +22,17 @@ os scripts em `tools/` e o launcher original em `launcher/`. Este arquivo cobre 
 faz ele ler mais arquivos e gasta mais tokens do que com o launcher original. Se você quer só uma tela limpa e
 mínima, use o `launcher/`.
 
-**Explorar** (botão do controle ou o atalho na tela inicial) segue o app Apple TV: um banner com o que está em
-alta e o recomendado para você, fileiras de seis títulos com "Ver mais" (abre a lista inteira em grade) e um
-menu à esquerda (seta para a esquerda na borda abre; direita ou Voltar fecha) com Buscar, Início, Minha lista,
-Top 10 do dia, Filmes, Séries e uma página para cada serviço com app na TV. As imagens ficam em cache no disco
-(até 160 MB, uma semana).
+**Explorar** (botão do controle ou o atalho na tela inicial) segue o app Apple TV e o visual da tela inicial: um
+banner com o que está em alta e o recomendado para você, fileiras de seis títulos com "Ver mais" (abre a lista
+inteira em grade, carregada conforme você desce), fundo com a capa do título focado e um menu à esquerda (seta para a
+esquerda na borda abre; direita ou Voltar fecha): Buscar (com buscas recentes), Início, Minha lista (abas: lista,
+favoritos, já assisti, notas), Top 10 do dia, Filmes, Séries, Categorias, o que você fixou (segure OK numa categoria
+ou busca), uma página por serviço com app na TV e Ajustes (conta TMDB, serviços, itens fixados). Títulos já vistos
+têm um ✓ na capa. "Assistir em…" abre o título direto no app quando o Wikidata conhece o ID dele no serviço (Netflix,
+Disney+, Apple TV, Max, Prime Video); senão abre o app. As imagens ficam em cache no disco (até 160 MB, uma semana).
 
-**Segurar OK** num app da prateleira abre um menu: Mover, Logo e cor (URL de um PNG e cor de fundo), Sair.
+**Segurar OK** num app da tela inicial (prateleira ou Todos os Apps) abre um menu a partir do card: Mover, Logo e cor
+(URL de um PNG e cor de fundo), Configurações do app (parar, limpar cache) e Sair.
 
 Para abrir o Explorar pelo computador: `adb shell am start -n io.cleanyourtv.ui/.HomeActivity --es open explore`
 (ou `--es open watchlist`).

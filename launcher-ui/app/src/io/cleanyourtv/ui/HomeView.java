@@ -2178,32 +2178,58 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         return it.kind == HomeApps.APP && it.pkg != null;
     }
 
-    private boolean canHold() {
-        if (sheetOpen || zone != Z_SHELF || shelfIndex >= shelf.size()) return false;
-        HomeApps.Item it = shelf.get(shelfIndex);
-        return it.kind == HomeApps.APP && it.pkg != null;
+    /** The app under the focus that OK can be held on: a shelf app or one in "All Apps". */
+    private HomeApps.Item heldApp() {
+        HomeApps.Item it = null;
+        if (sheetOpen) {
+            if (gridIndex < others.size()) it = others.get(gridIndex);
+        } else if (zone == Z_SHELF && shelfIndex < shelf.size()) {
+            it = shelf.get(shelfIndex);
+        }
+        return it != null && it.kind == HomeApps.APP && it.pkg != null ? it : null;
     }
 
-    /** OK held on a shelf app: Move, Logo and color, or Close, in a small menu over the home screen. */
+    private boolean canHold() {
+        return heldApp() != null;
+    }
+
+    /**
+     * OK held on an app: a small menu drops from its card: Move (shelf), Logo and color, the app's Android settings
+     * (stop it, clear its cache) and Close.
+     */
     private void appMenu() {
         handler.removeCallbacks(holdStart);
         holdArmed = false;
-        if (reordering || !canHold()) return;
+        HomeApps.Item it = heldApp();
+        if (reordering || it == null) return;
         okHeld = true;      // the release of this press opens nothing
-        HomeApps.Item it = shelf.get(shelfIndex);
-        boolean movable = canReorder();
-        String[] items = movable
-                ? new String[] {Ui.tr("Mover", "Move"), Ui.tr("Logo e cor", "Logo and color"), Ui.tr("Sair", "Close")}
-                : new String[] {Ui.tr("Logo e cor", "Logo and color"), Ui.tr("Sair", "Close")};
+        boolean movable = !sheetOpen && canReorder();
+        List<String> labels = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+        if (movable) {
+            labels.add(Ui.tr("Mover", "Move"));
+            actions.add(this::startReorder);
+        }
+        labels.add(Ui.tr("Logo e cor", "Logo and color"));
+        actions.add(() -> CustomTiles.edit(activity, it.pkg, it.label, this::reload));
+        labels.add(Ui.tr("Configurações do app", "App settings"));
+        actions.add(() -> {
+            try {
+                activity.startActivity(new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        android.net.Uri.parse("package:" + it.pkg)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+            } catch (Exception e) {
+                showToast(Ui.tr("Esta TV não abre os ajustes do app.", "This TV can't open the app's settings."));
+            }
+        });
+        labels.add(Ui.tr("Sair", "Close"));
+        actions.add(() -> {});
+        RectF r = sheetOpen ? focusedCell : tileRects[shelfIndex];
+        int[] at = new int[2];
+        getLocationInWindow(at);
+        android.graphics.Rect anchor = new android.graphics.Rect(Math.round(r.left) + at[0], Math.round(r.top) + at[1],
+                Math.round(r.right) + at[0], Math.round(r.bottom) + at[1]);
         click.open();
-        new android.app.AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle(it.label)
-                .setItems(items, (d, which) -> {
-                    int choice = movable ? which : which + 1;
-                    if (choice == 0) startReorder();
-                    else if (choice == 1) CustomTiles.edit(activity, it.pkg, it.label, this::reload);
-                })
-                .show();
+        TvUi.popover(activity, this, anchor, it.label, labels.toArray(new String[0]), which -> actions.get(which).run(), night < 0.5f);
     }
 
     private void startReorder() {

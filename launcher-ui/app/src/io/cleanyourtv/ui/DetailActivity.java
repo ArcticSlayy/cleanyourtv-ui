@@ -241,6 +241,10 @@ public class DetailActivity extends Activity {
                 () -> GridActivity.open(this, Ui.tr("Parecidos com ", "Like ") + name, "/" + kind + "/" + id + "/recommendations", kind)));
         View first = actions.getChildAt(0);
         if (first != null) first.requestFocus();
+        new Thread(() -> {
+            java.util.Map<String, String> links = DeepLinks.find(kind, id, name);
+            main.post(() -> { if (!isFinishing()) linksKnown(links); });
+        }).start();
     }
 
     private String certification(JSONObject o) {
@@ -449,6 +453,7 @@ public class DetailActivity extends Activity {
         n.setText(name);
         TextView s = TvUi.text(this, k, 21, Ui.regular, TvUi.DIM);
         s.setText(type + "  ·  " + (app != null ? Ui.tr("abre ", "opens ") + Providers.label(this, app) : Ui.tr("sem app na TV", "no app on the TV")));
+        if (app != null) chipNotes.add(new Object[] {app, s, type});
         s.setPadding(0, Math.round(6 * k), 0, 0);
         texts.addView(n);
         texts.addView(s);
@@ -462,9 +467,24 @@ public class DetailActivity extends Activity {
         return chip;
     }
 
+    /** Opens the title in the app (a Wikidata deep link), or else the app's home. */
     private void watch(String pkg) {
         if (title != null) Tmdb.setSeen(this, title, true);
-        RemoteKeys.run(this, pkg);
+        String name = title == null ? "" : title.name;
+        new Thread(() -> {
+            String url = DeepLinks.find(kind, id, name).get(pkg);
+            main.post(() -> { if (!DeepLinks.open(this, pkg, url)) RemoteKeys.run(this, pkg); });
+        }).start();
+    }
+
+    private final List<Object[]> chipNotes = new ArrayList<>();   // {app, subtitle view, kind of offer}
+
+    /** Once the links are known: the chips that open the title itself say so. */
+    private void linksKnown(java.util.Map<String, String> links) {
+        for (Object[] n : chipNotes) {
+            String app = (String) n[0];
+            if (links.containsKey(app)) ((TextView) n[1]).setText(n[2] + "  ·  " + Ui.tr("abre o título em ", "opens the title in ") + Providers.label(this, app));
+        }
     }
 
     private void background(String failure, Task task) {

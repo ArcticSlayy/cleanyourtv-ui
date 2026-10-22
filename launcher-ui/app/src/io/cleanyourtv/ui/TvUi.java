@@ -1,18 +1,29 @@
 package io.cleanyourtv.ui;
 
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.ColorFilter;
+import android.graphics.LinearGradient;
+import android.graphics.Paint;
+import android.graphics.PixelFormat;
 import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.PopupWindow;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -28,6 +39,8 @@ final class TvUi {
     /** Posters in a row before its "See more" card: a row never scrolls sideways. */
     static final int ROW_MAX = 6;
     static final int POSTER_W = 210, POSTER_H = 315, POSTER_GAP = 26;
+    /** Like the home screen's cards: they grow this much when focused. */
+    private static final float GROW = 0.08f;
 
     static float k(Activity a) {
         return a.getResources().getDisplayMetrics().widthPixels / 1920f;
@@ -49,7 +62,11 @@ final class TvUi {
         return d;
     }
 
-    /** Focused: lifted like the home screen's tiles, bigger with a deep shadow, no outline. */
+    /**
+     * Focused like the home screen's cards: it grows, rises with a deep shadow and gets a soft sheen at the top and a
+     * thin light rim; at rest a faint veil and hairline. The caption brightens and, when too long, scrolls like a
+     * bus sign.
+     */
     static void focusable(View v, float k, float radius) {
         focusable(v, k, radius, null);
     }
@@ -58,11 +75,76 @@ final class TvUi {
         v.setFocusable(true);
         v.setFocusableInTouchMode(true);
         v.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        Look look = new Look(k, radius);
+        v.setForeground(look);
         v.setOnFocusChangeListener((view, has) -> {
-            float s = has ? 1.1f : 1f;
-            view.animate().scaleX(s).scaleY(s).translationZ(has ? 28 * k : 0).setDuration(160).start();
-            if (caption != null) caption.setTextColor(has ? INK : DIM);
+            float s = has ? 1 + GROW : 1f;
+            view.animate().scaleX(s).scaleY(s).translationZ(has ? 30 * k : 0).translationY(has ? -4 * k : 0).setDuration(180).start();
+            look.animateTo(has ? 1 : 0);
+            if (caption != null) {
+                caption.setTextColor(has ? INK : DIM);
+                caption.setEllipsize(has ? TextUtils.TruncateAt.MARQUEE : TextUtils.TruncateAt.END);
+                caption.setSelected(has);
+            }
         });
+    }
+
+    /** The focus look drawn over a card: veil at rest; sheen and rim when focused (as HomeView.drawCard). */
+    static final class Look extends Drawable {
+        private final float k, radius;
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG), line = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF r = new RectF();
+        private LinearGradient sheen;
+        private int sheenH;
+        private float f;
+        private ValueAnimator anim;
+
+        Look(float k, float radius) {
+            this.k = k;
+            this.radius = radius;
+            line.setStyle(Paint.Style.STROKE);
+        }
+
+        void animateTo(float target) {
+            if (anim != null) anim.cancel();
+            anim = ValueAnimator.ofFloat(f, target);
+            anim.setDuration(180);
+            anim.addUpdateListener(a -> {
+                f = (float) a.getAnimatedValue();
+                invalidateSelf();
+            });
+            anim.start();
+        }
+
+        @Override public void draw(Canvas c) {
+            Rect b = getBounds();
+            r.set(b);
+            if (f < 0.99f) {
+                fill.setShader(null);
+                fill.setColor(Ui.alpha(0xFF000000, 0.1f * (1 - f)));
+                c.drawRoundRect(r, radius, radius, fill);
+            }
+            if (f > 0.01f) {
+                if (sheen == null || sheenH != b.height()) {
+                    sheenH = b.height();
+                    sheen = new LinearGradient(0, b.top, 0, b.top + b.height() / 2f, 0x26FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP);
+                }
+                fill.setShader(sheen);
+                fill.setAlpha(Math.round(255 * f));
+                c.drawRoundRect(r, radius, radius, fill);
+                fill.setShader(null);
+                fill.setAlpha(255);
+            }
+            float w = 1.5f * k;
+            r.inset(w / 2, w / 2);
+            line.setStrokeWidth(w);
+            line.setColor(f > 0.01f ? Ui.alpha(0xFFFFFFFF, 0.08f + 0.37f * f) : 0x14FFFFFF);
+            c.drawRoundRect(r, radius, radius, line);
+        }
+
+        @Override public void setAlpha(int alpha) {}
+        @Override public void setColorFilter(ColorFilter cf) {}
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
     }
 
     /** A list item (an episode, a service): a soft card that lights up when focused, nothing grows past its edges. */
@@ -132,6 +214,7 @@ final class TvUi {
         FrameLayout card = new FrameLayout(a);
         card.setBackground(round(CARD, 14 * k));
         card.setClipToOutline(true);
+        card.setTag(t);
         ImageView img = new ImageView(a);
         img.setScaleType(ImageView.ScaleType.CENTER_CROP);
         card.addView(img, new FrameLayout.LayoutParams(w, h));
@@ -140,7 +223,8 @@ final class TvUi {
         fallback.setGravity(Gravity.CENTER);
         fallback.setPadding(Math.round(14 * k), 0, Math.round(14 * k), 0);
         card.addView(fallback, 0, new FrameLayout.LayoutParams(w, h));
-        Images.load(img, t.poster.isEmpty() ? null : Tmdb.POSTER + t.poster);
+        if (t.kind.equals("movie") || t.kind.equals("tv")) card.addView(seenBadge(a, k), badgeParams(k));
+        Images.load(img, t.poster.isEmpty() ? null : (t.kind.equals("person") ? Tmdb.PROFILE : Tmdb.POSTER) + t.poster);
         card.setContentDescription(t.name + (t.year.isEmpty() ? "" : ", " + t.year));
         card.setOnClickListener(v -> open.open(t));
         cell.addView(card, new LinearLayout.LayoutParams(w, h));
@@ -149,12 +233,47 @@ final class TvUi {
         name.setText(t.name);
         name.setSingleLine(true);
         name.setEllipsize(TextUtils.TruncateAt.END);
+        name.setMarqueeRepeatLimit(-1);
+        name.setHorizontalFadingEdgeEnabled(true);
+        name.setFadingEdgeLength(Math.round(18 * k));
         name.setPadding(0, Math.round(26 * k), 0, 0);
         cell.addView(name, new LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.rightMargin = Math.round(POSTER_GAP * k);
         cell.setLayoutParams(lp);
+        refreshSeen(card);
         return cell;
+    }
+
+    /** A check in a dark circle at the poster's top right: seen. */
+    private static View seenBadge(Context c, float k) {
+        TextView b = text(c, k, 24, Ui.semibold, INK);
+        b.setText("✓");
+        b.setGravity(Gravity.CENTER);
+        b.setBackground(round(0xD9101216, 22 * k));
+        b.setTag("seen");
+        b.setElevation(4 * k);
+        return b;
+    }
+
+    private static FrameLayout.LayoutParams badgeParams(float k) {
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(Math.round(44 * k), Math.round(44 * k), Gravity.TOP | Gravity.END);
+        lp.topMargin = lp.rightMargin = Math.round(10 * k);
+        return lp;
+    }
+
+    /** Shows or hides the seen badges under `root` (back from a title page that changed it). */
+    static void refreshSeen(View root) {
+        if (root.getTag() instanceof Tmdb.Title && root instanceof ViewGroup) {
+            Tmdb.Title t = (Tmdb.Title) root.getTag();
+            View badge = root.findViewWithTag("seen");
+            if (badge != null) badge.setVisibility(Tmdb.isSeen(root.getContext(), t.kind, t.id) ? View.VISIBLE : View.GONE);
+            return;
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) root;
+            for (int i = 0; i < g.getChildCount(); i++) refreshSeen(g.getChildAt(i));
+        }
     }
 
     /** The last card of a long row: opens all of it as a grid. */
@@ -184,6 +303,11 @@ final class TvUi {
         return cell;
     }
 
+    /** The poster's title under the focus (the backdrop behind Explore follows it), or null. */
+    static Tmdb.Title titleOf(View focused) {
+        return focused != null && focused.getTag() instanceof Tmdb.Title ? (Tmdb.Title) focused.getTag() : null;
+    }
+
     /**
      * A horizontal line of cards that remembers its card: coming from above or below lands on the card focused last
      * (the first one at the start), not on whichever card happens to be nearest.
@@ -211,13 +335,20 @@ final class TvUi {
         }
     }
 
-    /** Posters in a vertical grid, `columns` per line; more can be added later (the next page). */
+    /**
+     * Posters in a vertical grid, `columns` per line. Like a FlatList: a long list is built a few lines at a time as
+     * the focus nears the end (TvUi.Scroll asks), so a list of hundreds opens at once.
+     */
     static final class Grid extends LinearLayout {
+        private static final int CHUNK_LINES = 3;
         private final Activity a;
         private final float k;
         private final int columns;
         private final OnTitle open;
         private LinearLayout line;
+        private final List<Tmdb.Title> waiting = new ArrayList<>();
+        /** Asked when the focus nears the end and nothing is waiting (the next TMDB page). */
+        Runnable needMore;
         int count;
 
         Grid(Activity a, float k, int columns, OnTitle open) {
@@ -230,8 +361,14 @@ final class TvUi {
             setClipChildren(false);
         }
 
+        /** Adds titles: the first lines right away, the rest as the focus gets there. */
         void add(List<Tmdb.Title> titles) {
-            for (Tmdb.Title t : titles) add(poster(a, k, t, open));
+            waiting.addAll(titles);
+            showWaiting(columns * CHUNK_LINES);
+        }
+
+        private void showWaiting(int n) {
+            for (int i = 0; i < n && !waiting.isEmpty(); i++) add(poster(a, k, waiting.remove(0), open));
         }
 
         void add(View cell) {
@@ -239,11 +376,19 @@ final class TvUi {
                 line = new LinearLayout(a);
                 line.setOrientation(HORIZONTAL);
                 line.setClipChildren(false);
+                line.setClipToPadding(false);
                 line.setPadding(Math.round(24 * k), Math.round(30 * k), 0, Math.round(16 * k));
                 addView(line);
             }
             line.addView(cell);
             count++;
+        }
+
+        /** The focus is on `focused` (inside this grid): near the end, the next lines (or the next page). */
+        void near(View focused) {
+            if (lineOf(focused) < getChildCount() - 2) return;
+            if (!waiting.isEmpty()) showWaiting(columns * CHUNK_LINES);
+            else if (needMore != null) needMore.run();
         }
 
         int lineOf(View focused) {
@@ -259,7 +404,8 @@ final class TvUi {
 
     /**
      * A vertical scroll for the TV: the focused item is brought to the middle of the screen, and only when it would
-     * otherwise sit near an edge (moving between things already in view doesn't scroll).
+     * otherwise sit near an edge (moving between things already in view doesn't scroll). A grid under the focus is
+     * told, so it builds its next lines.
      */
     static final class Scroll extends ScrollView {
         private int aim = -1;
@@ -270,6 +416,16 @@ final class TvUi {
             setVerticalScrollBarEnabled(false);
             setClipChildren(false);
             setSmoothScrollingEnabled(true);
+        }
+
+        @Override public void requestChildFocus(View child, View focused) {
+            super.requestChildFocus(child, focused);
+            for (View v = focused; v != null && v != this; v = v.getParent() instanceof View ? (View) v.getParent() : null) {
+                if (v instanceof Grid) {
+                    ((Grid) v).near(focused);
+                    break;
+                }
+            }
         }
 
         @Override protected int computeScrollDeltaToGetChildRectOnScreen(Rect r) {
@@ -348,5 +504,66 @@ final class TvUi {
                 lineH = Math.max(lineH, c.getMeasuredHeight());
             }
         }
+    }
+
+    interface OnPick { void pick(int which); }
+
+    /**
+     * A small menu that drops from a card (instead of Android's dialog): a dark rounded panel above `anchor` (window
+     * coordinates), its options as rows that turn white when focused. Back closes it.
+     */
+    static PopupWindow popover(Activity a, View parent, Rect anchor, String title, String[] items, OnPick pick) {
+        return popover(a, parent, anchor, title, items, pick, false);
+    }
+
+    /** `light`: frosted white like the home screen by day, dark ink on it. */
+    static PopupWindow popover(Activity a, View parent, Rect anchor, String title, String[] items, OnPick pick, boolean light) {
+        float k = k(a);
+        int ink = light ? 0xFF1C1C1E : INK, pill = light ? 0xFF1C1C1E : INK, onPill = light ? 0xFFFFFFFF : 0xFF14161A;
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(Math.round(14 * k), Math.round(18 * k), Math.round(14 * k), Math.round(14 * k));
+        box.setBackground(round(light ? 0xF7F4F4F6 : 0xF2202329, 26 * k));
+        box.setElevation(30 * k);
+        TextView h = text(a, k, 22, Ui.semibold, light ? 0x8C1C1C1E : FAINT);
+        h.setText(title.toUpperCase(java.util.Locale.ROOT));
+        h.setLetterSpacing(0.1f);
+        h.setPadding(Math.round(22 * k), 0, Math.round(22 * k), Math.round(12 * k));
+        box.addView(h);
+        PopupWindow pop = new PopupWindow(box, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        pop.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
+        pop.setElevation(30 * k);
+        View first = null;
+        for (int i = 0; i < items.length; i++) {
+            final int which = i;
+            TextView row = text(a, k, 28, Ui.medium, ink);
+            row.setText(items[i]);
+            row.setMinWidth(Math.round(340 * k));
+            row.setPadding(Math.round(22 * k), Math.round(16 * k), Math.round(22 * k), Math.round(16 * k));
+            row.setFocusable(true);
+            row.setOnFocusChangeListener((v, has) -> {
+                v.setBackground(has ? round(pill, 16 * k) : null);
+                ((TextView) v).setTextColor(has ? onPill : ink);
+            });
+            row.setOnClickListener(v -> {
+                pop.dismiss();
+                pick.pick(which);
+            });
+            row.setOnKeyListener((v, code, e) -> code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT
+                    || (code == KeyEvent.KEYCODE_DPAD_UP && which == 0) || (code == KeyEvent.KEYCODE_DPAD_DOWN && which == items.length - 1));
+            box.addView(row);
+            if (first == null) first = row;
+        }
+        box.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        int w = box.getMeasuredWidth(), hgt = box.getMeasuredHeight();
+        int screenW = a.getResources().getDisplayMetrics().widthPixels;
+        int x = Math.max(Math.round(24 * k), Math.min(screenW - w - Math.round(24 * k), anchor.centerX() - w / 2));
+        int y = anchor.top - hgt - Math.round(22 * k);
+        if (y < Math.round(24 * k)) y = anchor.bottom + Math.round(22 * k);
+        pop.setAnimationStyle(android.R.style.Animation_Dialog);
+        pop.showAtLocation(parent, Gravity.NO_GRAVITY, x, y);
+        View focus = first;
+        if (focus != null) focus.post(focus::requestFocus);
+        return pop;
     }
 }
