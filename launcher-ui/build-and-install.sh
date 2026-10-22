@@ -114,11 +114,12 @@ if [ "${SCREENSAVER:-1}" = 1 ]; then
   esac
 fi
 
-# The remote's app buttons from inside any app, with KEY_SERVICE=1. Android turns accessibility services off on
-# every reinstall, so pass the flag each time.
-if [ "${KEY_SERVICE:-0}" = 1 ]; then
+# The remote's app buttons from inside any app, with KEY_SERVICE=1 (once: a reinstall keeps them on). Replacing the
+# APK unbinds the service while it stays listed, and Android binds it again only when the list changes, so a listed
+# service is cleared and written back, as CleanYourTV's launcher does since its PR #526.
+if [ "${KEY_SERVICE:-0}" = 1 ] || tv "settings get secure enabled_accessibility_services" | grep -q "$PKG/.RemoteKeyService"; then
   svc=$PKG/.RemoteKeyService
-  tv "s=\$(settings get secure enabled_accessibility_services); case \"\$s\" in *$svc*) ;; null|'') settings put secure enabled_accessibility_services $svc ;; *) settings put secure enabled_accessibility_services \"\$s:$svc\" ;; esac; settings put secure accessibility_enabled 1; echo remote buttons enabled"
+  tv "s=\$(settings get secure enabled_accessibility_services); case \"\$s\" in *$svc*) settings put secure enabled_accessibility_services ''; settings put secure accessibility_enabled 0; sleep 1; settings put secure enabled_accessibility_services \"\$s\" ;; null|'') settings put secure enabled_accessibility_services $svc ;; *) settings put secure enabled_accessibility_services \"\$s:$svc\" ;; esac; settings put secure accessibility_enabled 1; echo remote buttons enabled"
 fi
-echo "Installed. Press Home on the remote to see it. Back to the original CleanYourTV launcher:"
-echo "  TV_HOST=$TV_HOST tools/tv.py 'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity'"
+echo "Installed. Press Home on the remote to see it. Back to CleanYourTV's own launcher:"
+echo "  TV_HOST=$TV_HOST launcher/build-and-install.sh   (or, if it is still installed: tools/tv.py 'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity')"

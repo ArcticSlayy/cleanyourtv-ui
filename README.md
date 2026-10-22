@@ -104,7 +104,7 @@ TV. The debloat, the supported TVs and how to go back are in [CleanYourTV's READ
    ```bash
    TV_HOST=192.168.1.50 KEY_SERVICE=1 launcher-ui/build-and-install.sh
    ```
-   `KEY_SERVICE=1` turns on the remote-button service (pass it again on every reinstall). `SCREENSAVER=0` keeps the
+   `KEY_SERVICE=1` turns on the remote-button service, once: reinstalls keep it on. `SCREENSAVER=0` keeps the
    current screensaver.
 4. Optional: `TV_HOST=… launcher-ui/config.sh my-config.json` (see `launcher-ui/config.example.json`) and
    `launcher-ui/config.sh --remote examples/<model>/remote.json`.

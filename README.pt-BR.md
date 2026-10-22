@@ -106,7 +106,7 @@ Detalhes do debloat, dos modelos suportados e de como voltar estão no [README d
    ```bash
    TV_HOST=192.168.1.50 KEY_SERVICE=1 launcher-ui/build-and-install.sh
    ```
-   `KEY_SERVICE=1` liga o serviço dos botões do controle (passe de novo a cada reinstalação). `SCREENSAVER=0`
+   `KEY_SERVICE=1` liga o serviço dos botões do controle, uma vez: as reinstalações mantêm ligado. `SCREENSAVER=0`
    mantém o screensaver atual.
 4. Opcional: `TV_HOST=… launcher-ui/config.sh meu-config.json` (veja `launcher-ui/config.example.json`) e
    `launcher-ui/config.sh --remote examples/<modelo>/remote.json`.
