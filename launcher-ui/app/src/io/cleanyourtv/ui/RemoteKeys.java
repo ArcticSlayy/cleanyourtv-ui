@@ -136,10 +136,11 @@ final class RemoteKeys {
                 return new Intent(Settings.ACTION_SETTINGS);
             case "live":
                 return HomeApps.liveTv(c);
-            case "tmdb:explore":
-                return new Intent().setClassName(c, ExploreActivity.class.getName());
+            case "tmdb:explore":    // a fresh Explore: whatever was open in it before is dropped
+                return new Intent().setClassName(c, ExploreActivity.class.getName()).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
             case "tmdb:watchlist":
-                return new Intent().setClassName(c, ExploreActivity.class.getName()).putExtra(ExploreActivity.EXTRA_SECTION, "watchlist");
+                return new Intent().setClassName(c, ExploreActivity.class.getName()).putExtra(ExploreActivity.EXTRA_SECTION, "watchlist")
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
             default:
                 if (action.startsWith("input:")) {
                     return new Intent(Intent.ACTION_VIEW).setDataAndType(

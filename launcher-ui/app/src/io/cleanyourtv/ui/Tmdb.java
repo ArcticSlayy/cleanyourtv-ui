@@ -118,7 +118,8 @@ final class Tmdb {
         final int id;
         final String name, poster, backdrop, year;
         final double vote;
-        String overview = "";
+        String overview = "", lang = "", date = "";
+        int[] genres = new int[0];
 
         Title(String kind, int id, String name, String poster, String backdrop, String year, double vote) {
             this.kind = kind;
@@ -158,6 +159,13 @@ final class Tmdb {
             Title t = new Title(k, o.optInt("id"), o.optString(k.equals("movie") ? "title" : "name"), poster,
                     o.optString("backdrop_path", ""), date.length() >= 4 ? date.substring(0, 4) : "", o.optDouble("vote_average", 0));
             t.overview = o.optString("overview", "");
+            t.lang = o.optString("original_language", "");
+            t.date = date;
+            JSONArray g = o.optJSONArray("genre_ids");
+            if (g != null) {
+                t.genres = new int[g.length()];
+                for (int j = 0; j < g.length(); j++) t.genres[j] = g.optInt(j);
+            }
             out.add(t);
         }
         return out;

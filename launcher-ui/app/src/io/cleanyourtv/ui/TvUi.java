@@ -36,8 +36,8 @@ final class TvUi {
 
     static final int BG = 0xFF0B0D12, INK = 0xFFF5F6F8, DIM = 0x99F5F6F8, FAINT = 0x59F5F6F8, CARD = 0xFF1A1D24,
             ACCENT = 0xFF19B5A6;
-    /** Posters in a row before its "See more" card: a row never scrolls sideways. */
-    static final int ROW_MAX = 6;
+    /** Posters in a row (it scrolls sideways) before its "See more" card. */
+    static final int ROW_MAX = 10;
     static final int POSTER_W = 210, POSTER_H = 315, POSTER_GAP = 26;
     /** Like the home screen's cards: they grow this much when focused. */
     private static final float GROW = 0.08f;
@@ -185,6 +185,11 @@ final class TvUi {
     }
 
     static View row(Activity a, float k, String title, List<Tmdb.Title> titles, OnTitle open, Runnable more) {
+        return row(a, k, title, titles, open, more, 0);
+    }
+
+    /** `inset`: the page's left margin; the row scrolls under it to the screen's edge, its first poster lines up with it. */
+    static View row(Activity a, float k, String title, List<Tmdb.Title> titles, OnTitle open, Runnable more, int inset) {
         LinearLayout box = new LinearLayout(a);
         box.setOrientation(LinearLayout.VERTICAL);
         TextView h = text(a, k, 32, Ui.semibold, INK);
@@ -194,13 +199,17 @@ final class TvUi {
         Row line = new Row(a);
         line.setClipChildren(false);
         line.setClipToPadding(false);
-        line.setPadding(Math.round(24 * k), Math.round(30 * k), 0, Math.round(20 * k));
+        line.setPadding(inset + Math.round(24 * k), Math.round(30 * k), Math.round(96 * k), Math.round(20 * k));
         for (int i = 0; i < titles.size() && i < ROW_MAX; i++) line.addView(poster(a, k, titles.get(i), open));
         if (titles.size() > ROW_MAX || (more != null && titles.size() >= ROW_MAX)) {
             Runnable all = more != null ? more : () -> GridActivity.show(a, title, titles, open);
             line.addView(moreCard(a, k, all));
         }
-        box.addView(line);
+        HScroll scroll = new HScroll(a, Math.round(300 * k));
+        scroll.addView(line);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.leftMargin = -inset;
+        box.addView(scroll, lp);
         box.setClipChildren(false);
         box.setPadding(0, Math.round(26 * k), 0, Math.round(10 * k));
         return box;
@@ -333,6 +342,116 @@ final class TvUi {
                 keep.addFocusables(views, direction, mode);
             }
         }
+    }
+
+    /** A row's sideways scroll: the focused poster is kept `margin` away from the edges, so the next one shows. */
+    static final class HScroll extends android.widget.HorizontalScrollView {
+        private final int margin;
+
+        HScroll(Context c, int margin) {
+            super(c);
+            this.margin = margin;
+            setFocusable(false);
+            setHorizontalScrollBarEnabled(false);
+            setClipChildren(false);
+            setClipToPadding(false);
+            setSmoothScrollingEnabled(true);
+        }
+
+        @Override protected int computeScrollDeltaToGetChildRectOnScreen(Rect r) {
+            int w = getWidth(), x = getScrollX();
+            if (w == 0 || getChildCount() == 0) return 0;
+            int max = Math.max(0, getChildAt(0).getWidth() - w);
+            if (r.right > x + w - margin) return Math.min(max - x, r.right - (x + w - margin));
+            if (r.left < x + margin) return Math.max(-x, r.left - (x + margin));
+            return 0;
+        }
+    }
+
+    /** A symbol from assets/symbols, drawn in the view's color. */
+    static final class Icon extends View {
+        private final String name;
+        private final float size;
+        private int color = INK;
+
+        Icon(Context c, String name, float size) {
+            super(c);
+            this.name = name;
+            this.size = size;
+        }
+
+        void color(int c) {
+            color = c;
+            invalidate();
+        }
+
+        @Override protected void onDraw(Canvas c) {
+            Symbols.draw(getContext(), c, name, getWidth() / 2f, getHeight() / 2f, size, color);
+        }
+    }
+
+    /** A pill with a symbol (and a label, or none for a round button): white when focused. */
+    static LinearLayout iconButton(Context c, float k, String symbol, String label, View.OnClickListener click) {
+        LinearLayout b = new LinearLayout(c);
+        b.setOrientation(LinearLayout.HORIZONTAL);
+        b.setGravity(Gravity.CENTER);
+        boolean round = label == null || label.isEmpty();
+        b.setPadding(Math.round((round ? 18 : 30) * k), Math.round(16 * k), Math.round((round ? 18 : 34) * k), Math.round(16 * k));
+        Icon icon = new Icon(c, symbol, 22 * k);
+        int side = Math.round(36 * k);
+        b.addView(icon, new LinearLayout.LayoutParams(side, side));
+        TextView t = null;
+        if (!round) {
+            t = text(c, k, 28, Ui.medium, INK);
+            t.setText(label);
+            t.setPadding(Math.round(14 * k), 0, 0, 0);
+            b.addView(t);
+        }
+        b.setBackground(round(0x33FFFFFF, 40 * k));
+        b.setFocusable(true);
+        b.setFocusableInTouchMode(true);
+        b.setOnClickListener(click);
+        TextView text = t;
+        b.setOnFocusChangeListener((v, has) -> {
+            b.setBackground(round(has ? INK : 0x33FFFFFF, 40 * k));
+            icon.color(has ? 0xFF14161A : INK);
+            if (text != null) text.setTextColor(has ? 0xFF14161A : INK);
+            v.animate().scaleX(has ? 1.06f : 1f).scaleY(has ? 1.06f : 1f).translationZ(has ? 12 * k : 0).setDuration(140).start();
+        });
+        b.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        return b;
+    }
+
+    /** A chip that is on or off (filters): on shows a check on a light pill; focused it turns white. */
+    static TextView toggle(Context c, float k, String label, boolean on, View.OnClickListener click) {
+        TextView b = text(c, k, 26, Ui.medium, INK);
+        b.setGravity(Gravity.CENTER);
+        b.setPadding(Math.round(28 * k), Math.round(14 * k), Math.round(28 * k), Math.round(14 * k));
+        b.setFocusable(true);
+        b.setFocusableInTouchMode(true);
+        b.setTag(on);
+        Runnable style = () -> {
+            boolean f = b.hasFocus(), sel = Boolean.TRUE.equals(b.getTag());
+            b.setText((sel ? "✓  " : "") + label);
+            b.setBackground(round(f ? INK : sel ? 0x66FFFFFF : 0x1FFFFFFF, 40 * k));
+            b.setTextColor(f ? 0xFF14161A : sel ? INK : DIM);
+        };
+        style.run();
+        b.setOnFocusChangeListener((v, has) -> style.run());
+        b.setOnClickListener(v -> {
+            b.setTag(!Boolean.TRUE.equals(b.getTag()));
+            style.run();
+            if (click != null) click.onClick(v);
+        });
+        return b;
+    }
+
+    /** A centered question with a yes and a no, like the shelf's menu. */
+    static void confirm(Activity a, String question, String yes, Runnable ok) {
+        View root = a.getWindow().getDecorView();
+        int w = root.getWidth(), h = root.getHeight();
+        Rect middle = new Rect(w / 2, h / 2, w / 2, h / 2 + 1);
+        popover(a, root, middle, question, new String[] {yes, Ui.tr("Cancelar", "Cancel")}, which -> { if (which == 0) ok.run(); });
     }
 
     /**

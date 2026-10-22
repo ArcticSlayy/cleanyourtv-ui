@@ -2911,6 +2911,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                         zone = Z_CARDS;
                         cardIndex = nearest(cardRects, cards.size(), topRects[topIndex].centerX());
                     }
+                } else if (topIndex < 3) {
+                    topIndex = 3;   // up from the tabs: the Explore button, the first of the round ones
                 } else {
                     return true;
                 }

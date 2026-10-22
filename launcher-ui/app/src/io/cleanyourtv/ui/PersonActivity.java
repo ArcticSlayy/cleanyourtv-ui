@@ -48,6 +48,7 @@ public class PersonActivity extends Activity {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setClipChildren(false);
         content.setPadding(Math.round(96 * k), Math.round(80 * k), 0, Math.round(80 * k));
+        content.setClipToPadding(false);
         TextView loading = TvUi.text(this, k, 30, Ui.regular, TvUi.DIM);
         loading.setText(Ui.tr("Carregando…", "Loading…"));
         content.addView(loading);
@@ -112,9 +113,9 @@ public class PersonActivity extends Activity {
         collect(credits == null ? null : credits.optJSONArray("cast"), movies, shows, seen);
         collect(credits == null ? null : credits.optJSONArray("crew"), crew, crew, seen);
         TvUi.OnTitle open = t -> DetailActivity.open(this, t.kind, t.id);
-        if (!movies.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Filmes", "Movies"), movies, open));
-        if (!shows.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Séries", "Shows"), shows, open));
-        if (!crew.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Por trás das câmeras", "Behind the camera"), crew, open));
+        if (!movies.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Filmes", "Movies"), movies, open, null, Math.round(96 * k)));
+        if (!shows.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Séries", "Shows"), shows, open, null, Math.round(96 * k)));
+        if (!crew.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Por trás das câmeras", "Behind the camera"), crew, open, null, Math.round(96 * k)));
         View first = content.findFocus();
         if (first == null && content.getChildCount() > 1) content.getChildAt(1).requestFocus();
     }

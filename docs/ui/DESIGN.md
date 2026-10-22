@@ -26,7 +26,7 @@ segunda tela inicial, inspirada no [Free My TV](https://github.com/simbasjungles
 | `launcher-ui/build-and-install.sh` (+ `.ps1`) | Mesmo contrato do `launcher/build-and-install.sh`: `TV_HOST`, `STOCK_LAUNCHER`, `HOME_KEY_SERVICE=1`, rollback se a Home não pegar. Usa `tools/tv.py` e `tools/b64push.py` sem modificá-los |
 | `launcher-ui/theme.sh` | Envia um `config.json` para o app novo (o `tools/theme.sh` do upstream só conhece o pacote do launcher original) |
 | `examples/<modelo>/remote.json` | Novo, opcional, por modelo: os botões do controle, o código de cada um e se é **nativo** (nunca remapeado) ou **configurável**, com o padrão |
-| `README.ui.md`, `PROMPT.ui.md` | Como usar o launcher novo; o prompt do upstream continua intacto |
+| `.github/README.md`, `PROMPT.ui.md` | Como usar o launcher novo; o prompt do upstream continua intacto |
 | `docs/ui/` | Este documento e o que vier |
 
 ## Telas e recursos do launcher novo (do Free My TV)
@@ -93,7 +93,7 @@ Uma tela própria para **navegar** em filmes e séries, não só as 3 sugestões
 ## Fases (cada uma termina testada na sua TV, com screenshots)
 
 1. **Esqueleto:** `launcher-ui/` com a Home do Free My TV sem ADB interno, build e instalação pelo script novo,
-   restore pelo `tools/restore.sh`. NOTICE e README.ui.md.
+   restore pelo `tools/restore.sh`. NOTICE e .github/README.md.
 2. **Configuração:** `config.json` por tema (prateleira, cidade, colunas) enviado pelo `launcher-ui/theme.sh`, e a
    tela de ajustes.
 3. **Botões:** `remote.json` da 55C725, serviço de teclas, tela Botões do Controle.

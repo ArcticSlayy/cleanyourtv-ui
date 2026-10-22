@@ -215,16 +215,16 @@ public class DetailActivity extends Activity {
             if (!seasonCards.isEmpty()) {
                 TvUi.OnTitle season = t -> SeasonActivity.open(this, id, t.id, name);
                 content.addView(TvUi.row(this, k, Ui.tr("Temporadas", "Seasons"), seasonCards, season,
-                        () -> GridActivity.show(this, name + " · " + Ui.tr("Temporadas", "Seasons"), seasonCards, season)));
+                        () -> GridActivity.show(this, name + " · " + Ui.tr("Temporadas", "Seasons"), seasonCards, season), Math.round(96 * k)));
             }
         }
         List<Tmdb.Title> cast = cast(o, movie);
         if (!cast.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Elenco", "Cast"), cast, open,
-                () -> GridActivity.show(this, name + " · " + Ui.tr("Elenco", "Cast"), cast, open)));
+                () -> GridActivity.show(this, name + " · " + Ui.tr("Elenco", "Cast"), cast, open), Math.round(96 * k)));
         if (collection != null) {
             List<Tmdb.Title> parts = Tmdb.titles(collection, "parts", "movie");
             parts.sort((a, b) -> a.year.compareTo(b.year));
-            if (parts.size() > 1) content.addView(TvUi.row(this, k, collection.optString("name"), parts, open));
+            if (parts.size() > 1) content.addView(TvUi.row(this, k, collection.optString("name"), parts, open, null, Math.round(96 * k)));
         }
         View keywords = keywords(o, movie);
         if (keywords != null) {
@@ -238,7 +238,7 @@ public class DetailActivity extends Activity {
         JSONObject recs = o.optJSONObject("recommendations");
         List<Tmdb.Title> similar = recs == null ? new ArrayList<>() : Tmdb.titles(recs, kind);
         if (!similar.isEmpty()) content.addView(TvUi.row(this, k, Ui.tr("Você também pode gostar", "You may also like"), similar, open,
-                () -> GridActivity.open(this, Ui.tr("Parecidos com ", "Like ") + name, "/" + kind + "/" + id + "/recommendations", kind)));
+                () -> GridActivity.open(this, Ui.tr("Parecidos com ", "Like ") + name, "/" + kind + "/" + id + "/recommendations", kind), Math.round(96 * k)));
         View first = actions.getChildAt(0);
         if (first != null) first.requestFocus();
         new Thread(() -> {

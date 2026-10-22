@@ -96,6 +96,7 @@
         <activity
             android:name=".ExploreActivity"
             android:process=":home"
+            android:taskAffinity="io.cleanyourtv.ui.explore"
             android:exported="false"
             android:screenOrientation="landscape"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
