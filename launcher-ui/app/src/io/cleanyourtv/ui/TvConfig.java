@@ -17,7 +17,7 @@ import java.util.List;
 /**
  * config.json pushed from the computer (launcher-ui/config.sh, through ConfigProvider) into the app's private folder. Each new file is
  * applied once, as if the person had made those choices on the TV; what they change on the TV afterwards still wins
- * until the next push. remote.json (the remote's buttons, launcher-ui/remote.sh) sits in the same folder.
+ * until the next push. remote.json (the remote's buttons, launcher-ui/config.sh --remote) sits in the same folder.
  */
 final class TvConfig {
     private TvConfig() {}

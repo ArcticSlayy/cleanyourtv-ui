@@ -835,8 +835,8 @@ public class SettingsActivity extends Activity {
             Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
             float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
             String line = keys.isEmpty()
-                    ? Ui.tr("Nenhum botão configurável: envie o remote.json do seu modelo (launcher-ui/remote.sh).",
-                            "No configurable buttons: push your model's remote.json (launcher-ui/remote.sh).")
+                    ? Ui.tr("Nenhum botão configurável: envie o remote.json do seu modelo (launcher-ui/config.sh --remote).",
+                            "No configurable buttons: push your model's remote.json (launcher-ui/config.sh --remote).")
                     : (keysScroll + focus + 1) + " / " + keys.size() + "  ·  "
                             + Ui.tr("OK escolhe o que o botão faz. Os demais funcionam como sempre.",
                             "OK picks what the button does. The rest work as always.");

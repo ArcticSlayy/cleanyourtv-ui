@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The remote's buttons. remote.json (examples/<model>/remote.json, pushed by launcher-ui/remote.sh) lists them: a
+ * The remote's buttons. remote.json (examples/<model>/remote.json, pushed by launcher-ui/config.sh --remote) lists them: a
  * "native" button is never touched, a "configurable" one runs the action the person picked in Settings > Remote
  * Buttons, or its default. Without remote.json, TCL and Vestel TVs keep the app buttons Free My TV handled.
  *
