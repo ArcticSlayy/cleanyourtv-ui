@@ -42,7 +42,7 @@ final class Providers {
         {"max", "com.wbd.stream", "com.hbo.hbonow"},
         {"apple tv", "com.apple.atve.androidtv.appletv"},
         {"globoplay", "com.globo.globotv"},
-        {"paramount", "com.cbs.ott"},
+        {"paramount", "com.cbs.ott", "com.cbs.ca"},
         {"crunchyroll", "com.crunchyroll.crunchyroid"},
         {"mubi", "com.mubi"},
         {"youtube", "com.google.android.youtube.tv"},

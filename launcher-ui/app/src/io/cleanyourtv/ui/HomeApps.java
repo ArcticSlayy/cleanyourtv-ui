@@ -88,6 +88,7 @@ final class HomeApps {
         {"appletv", "Apple TV", "com.apple.atve.androidtv.appletv", "B8BCC6", "", "1.1"},
         {"hulu", "Hulu", "com.hulu.livingroomplus", "1CE783", "", "1"},
         {"paramount", "Paramount+", "com.cbs.ott", "0064FF", "", "1"},
+        {"paramount", "Paramount+", "com.cbs.ca", "0064FF", "", "1"},
         {"peacock", "Peacock", "com.peacocktv.peacockandroid", "6E55DC", "", "1"},
         {"globoplay", "Globoplay", "com.globo.globotv", "FF5A1F", "tint", "1"},
         {"spotify", "Spotify", "com.spotify.tv.android", "1DB954", "", "1"},
@@ -137,7 +138,8 @@ final class HomeApps {
                 it.label = d != null ? d[1] : ri != null ? String.valueOf(ri.loadLabel(pm)) : pkg;
                 it.logo = custom;
                 it.logoInk = ink(custom);
-                it.logoScale = 1;
+                // A near-square picture (a mascot, an icon) gets the room a wordmark gets from its width.
+                it.logoScale = custom.getWidth() < custom.getHeight() * 1.6f ? 1.4f : 1;
             } else if (d == null) {
                 // An app picked in Settings > Shelf that isn't in SHELF: its own name and TV art.
                 it.key = pkg;

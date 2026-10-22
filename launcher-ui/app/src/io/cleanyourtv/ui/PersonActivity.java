@@ -153,4 +153,18 @@ public class PersonActivity extends Activity {
         String[] p = iso.split("-");
         return p.length == 3 ? p[2] + "/" + p[1] + "/" + p[0] : iso;
     }
+
+    private boolean stopped;
+
+    @Override protected void onStop() {
+        super.onStop();
+        stopped = true;
+        TvUi.releaseImages(getWindow().getDecorView());   // covered: its pictures go, the cache and the disk keep them
+    }
+
+    @Override protected void onStart() {
+        super.onStart();
+        if (stopped) TvUi.restoreImages(getWindow().getDecorView());
+        stopped = false;
+    }
 }

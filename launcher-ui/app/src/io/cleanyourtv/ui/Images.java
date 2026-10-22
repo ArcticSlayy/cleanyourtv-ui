@@ -29,7 +29,9 @@ final class Images {
     private Images() {}
 
     private static final long TTL = 7L * 24 * 3600_000, DISK_MAX = 160L * 1024 * 1024;
-    private static final LruCache<String, Bitmap> CACHE = new LruCache<String, Bitmap>(40 * 1024 * 1024) {
+    /** An eighth of what the process may use, at most 24 MB: the TV has little memory and the disk holds the rest. */
+    private static final LruCache<String, Bitmap> CACHE = new LruCache<String, Bitmap>(
+            (int) Math.min(24L * 1024 * 1024, Runtime.getRuntime().maxMemory() / 8)) {
         @Override protected int sizeOf(String key, Bitmap b) { return b.getByteCount(); }
     };
     private static final ExecutorService POOL = Executors.newFixedThreadPool(4);

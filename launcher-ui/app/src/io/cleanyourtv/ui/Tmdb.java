@@ -33,11 +33,22 @@ final class Tmdb {
     static final String POSTER = "https://image.tmdb.org/t/p/w342", BACKDROP = "https://image.tmdb.org/t/p/w1280",
             LOGO = "https://image.tmdb.org/t/p/w92", PROFILE = "https://image.tmdb.org/t/p/w185";
     static final String REGION = Config.TMDB_REGION.trim().isEmpty() ? "BR" : Config.TMDB_REGION.trim().toUpperCase(Locale.ROOT);
-    private static final long TTL = 10 * 60_000L;
+    /** In memory: the answers of the last half hour, a few dozen; on disk (DISK_MAX): for as long as ttl() says. */
+    private static final long TTL = 30 * 60_000L, DISK_MAX = 24L * 1024 * 1024;
 
     private static final Map<String, Object[]> CACHE = new LinkedHashMap<String, Object[]>(64, 0.75f, true) {
-        @Override protected boolean removeEldestEntry(Map.Entry<String, Object[]> e) { return size() > 120; }
+        @Override protected boolean removeEldestEntry(Map.Entry<String, Object[]> e) { return size() > 60; }
     };
+    private static java.io.File disk;
+
+    /** The disk cache's folder (every process calls this; it only remembers the folder). */
+    static synchronized void init(Context c) {
+        if (disk != null) return;
+        disk = new java.io.File(c.getApplicationContext().getCacheDir(), "tmdb");
+        //noinspection ResultOfMethodCallIgnored
+        disk.mkdirs();
+        new Thread(Tmdb::prune, "tmdb-prune").start();
+    }
 
     static boolean hasKey() { return !Config.TMDB_KEY.trim().isEmpty(); }
 
@@ -45,20 +56,89 @@ final class Tmdb {
         return "pt".equals(Ui.language) ? "pt-BR" : Ui.language;
     }
 
-    /** GET a v3 path ("/trending/all/day?…"); language is added when the path has none. */
+    /**
+     * How long an answer stays good on disk: lists of what's trending or new for hours, a title's page for half a
+     * day, what hardly changes (pictures, people, seasons, collections, the region's services) for a week.
+     */
+    private static long ttl(String path) {
+        if (path.contains("session_id")) return 0;
+        if (path.startsWith("/search/")) return 3600_000L;
+        if (path.startsWith("/trending/") || path.startsWith("/discover/") || path.contains("/now_playing")
+                || path.contains("/upcoming") || path.contains("/airing_today") || path.contains("/on_the_air")
+                || path.contains("/recommendations")) return 3 * 3600_000L;
+        if (path.contains("/images") || path.startsWith("/person/") || path.startsWith("/collection/")
+                || path.contains("/season/") || path.startsWith("/watch/providers") || path.contains("/top_rated")) return 7 * 24 * 3600_000L;
+        return 12 * 3600_000L;
+    }
+
+    /**
+     * GET a v3 path ("/trending/all/day?…"); language is added when the path has none. From memory, else from disk
+     * while fresh, else from TMDB (and kept). Without internet, an old copy on disk is better than nothing.
+     */
     static JSONObject get(String path) throws IOException, JSONException {
         String full = path + (path.contains("language=") ? "" : (path.contains("?") ? "&" : "?") + "language=" + lang());
+        long now = System.currentTimeMillis();
         synchronized (CACHE) {
             Object[] hit = CACHE.get(full);
-            if (hit != null && System.currentTimeMillis() - (Long) hit[0] < TTL) return (JSONObject) hit[1];
+            if (hit != null && now - (Long) hit[0] < TTL) return (JSONObject) hit[1];
         }
-        JSONObject o = new JSONObject(call("GET", full, null));
-        synchronized (CACHE) { CACHE.put(full, new Object[] {System.currentTimeMillis(), o}); }
+        long ttl = ttl(full);
+        java.io.File f = disk == null || ttl == 0 ? null : new java.io.File(disk, Integer.toHexString(full.hashCode()) + "-" + full.length() + ".json");
+        if (f != null && f.isFile() && now - f.lastModified() < ttl) {
+            try {
+                JSONObject o = new JSONObject(readAll(new java.io.FileInputStream(f)));
+                synchronized (CACHE) { CACHE.put(full, new Object[] {now, o}); }
+                return o;
+            } catch (IOException | JSONException ignored) {
+            }
+        }
+        String text;
+        try {
+            text = call("GET", full, null);
+        } catch (IOException e) {
+            if (f != null && f.isFile()) {
+                try { return new JSONObject(readAll(new java.io.FileInputStream(f))); } catch (IOException | JSONException ignored) {}
+            }
+            throw e;
+        }
+        JSONObject o = new JSONObject(text);
+        synchronized (CACHE) { CACHE.put(full, new Object[] {now, o}); }
+        if (f != null) {
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(f)) {
+                out.write(text.getBytes(StandardCharsets.UTF_8));
+            } catch (IOException ignored) {
+            }
+        }
         return o;
     }
 
-    static void forget(String prefix) {
-        synchronized (CACHE) { CACHE.keySet().removeIf(k -> k.startsWith(prefix)); }
+    /** The app left the screen: the parsed answers go (the disk keeps them). */
+    static void trimMemory() {
+        synchronized (CACHE) { CACHE.clear(); }
+    }
+
+    /** Files a week past their time go; then the oldest, until the folder fits in DISK_MAX. */
+    private static void prune() {
+        java.io.File[] files = disk.listFiles();
+        if (files == null) return;
+        long now = System.currentTimeMillis(), total = 0;
+        java.util.List<java.io.File> kept = new java.util.ArrayList<>();
+        for (java.io.File f : files) {
+            //noinspection ResultOfMethodCallIgnored
+            if (now - f.lastModified() > 14L * 24 * 3600_000) f.delete();
+            else {
+                kept.add(f);
+                total += f.length();
+            }
+        }
+        if (total <= DISK_MAX) return;
+        kept.sort((a, b) -> Long.compare(a.lastModified(), b.lastModified()));
+        for (java.io.File f : kept) {
+            if (total <= DISK_MAX * 3 / 4) break;
+            total -= f.length();
+            //noinspection ResultOfMethodCallIgnored
+            f.delete();
+        }
     }
 
     static JSONObject post(String path, JSONObject body) throws IOException, JSONException {

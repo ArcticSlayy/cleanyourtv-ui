@@ -53,7 +53,11 @@ Free My TV. Este projeto é para quem quer os dois e um Explorar completo.
 - Títulos já vistos com ✓ na capa; títulos longos rolam como letreiro no card focado.
 - Página do título: classificação, direção, onde assistir no Brasil, minha lista, já assisti, favoritar, nota,
   listas, trailer, temporadas e episódios, elenco (com a página de cada pessoa), coleção, palavras-chave e resenhas.
-- Imagens em cache no disco (até 160 MB, uma semana).
+- Rápido e leve: respostas do TMDB em cache no disco (listas por 3 h, títulos por 12 h, fotos e pessoas por uma
+  semana; sem internet, usa a cópia antiga) e imagens também (até 160 MB, uma semana). Quando você abre um app ou
+  a TV, o launcher solta o que guardava na memória: numa TCL de 2 GB, cerca de 66 MB em segundo plano, contra
+  ~155 MB antes.
+- Sem anúncios e sem telemetria: só fala com o TMDB, o Wikidata (IDs dos serviços) e o Open-Meteo (clima).
 
 **Controle e configuração**
 - `examples/<modelo>/remote.json` diz quais botões do controle podem ser trocados; na TV, cada um abre um app, uma

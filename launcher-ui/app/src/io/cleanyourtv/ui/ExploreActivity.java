@@ -98,7 +98,7 @@ public class ExploreActivity extends Activity {
     };
 
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final ExecutorService io = Executors.newFixedThreadPool(3);
+    private final ExecutorService io = Executors.newFixedThreadPool(4);
     private float k;
     private FrameLayout root;
     private TvUi.Scroll scroll;
@@ -523,7 +523,10 @@ public class ExploreActivity extends Activity {
         if (hero != null) restartHero();
     }
 
+    private long keyAt, pageAt;   // the banner arrives late: it takes the focus only if no key was pressed since
+
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
+        keyAt = android.os.SystemClock.uptimeMillis();
         int code = e.getKeyCode();
         boolean down = e.getAction() == KeyEvent.ACTION_DOWN;
         if (overlay != null) {
@@ -678,6 +681,7 @@ public class ExploreActivity extends Activity {
 
     private void showPage(String id) {
         current = id;
+        pageAt = android.os.SystemClock.uptimeMillis() + 1;
         int gen = ++generation;
         placed.clear();
         placedKeys.clear();
@@ -717,16 +721,20 @@ public class ExploreActivity extends Activity {
                     return;
                 }
         }
-        io.execute(() -> {
+        io.execute(() -> {   // the rows don't wait for the banner (on Home it asks for picks, title by title)
             List<Section> list = sections(id);
-            List<Object[]> banner = withHero ? heroItems(id) : null;
             main.post(() -> {
                 if (gen != generation || isFinishing()) return;
                 sections = list;
-                if (banner != null) setHero(banner);
                 load(gen, list, false);
             });
         });
+        if (withHero) {
+            io.execute(() -> {
+                List<Object[]> banner = heroItems(id);
+                main.post(() -> { if (gen == generation && !isFinishing()) setHero(banner); });
+            });
+        }
     }
 
     private String subtitle(String id) {
@@ -1751,7 +1759,7 @@ public class ExploreActivity extends Activity {
             heroDots.addView(dot, lp);
         }
         showHero();
-        if (!menuOpen && overlay == null) hero.requestFocus();
+        if (!menuOpen && overlay == null && keyAt < pageAt) hero.requestFocus();
         restartHero();
     }
 
@@ -2029,5 +2037,19 @@ public class ExploreActivity extends Activity {
             if (i < b.size()) out.add(b.get(i));
         }
         return out;
+    }
+
+    private boolean stopped;
+
+    @Override protected void onStop() {
+        super.onStop();
+        stopped = true;
+        TvUi.releaseImages(getWindow().getDecorView());   // covered: its pictures go, the cache and the disk keep them
+    }
+
+    @Override protected void onStart() {
+        super.onStart();
+        if (stopped) TvUi.restoreImages(getWindow().getDecorView());
+        stopped = false;
     }
 }

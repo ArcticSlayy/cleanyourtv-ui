@@ -242,7 +242,7 @@ public class DetailActivity extends Activity {
         View first = actions.getChildAt(0);
         if (first != null) first.requestFocus();
         new Thread(() -> {
-            java.util.Map<String, String> links = DeepLinks.find(kind, id, name);
+            java.util.Map<String, String> links = DeepLinks.find(this, kind, id, name);
             main.post(() -> { if (!isFinishing()) linksKnown(links); });
         }).start();
     }
@@ -472,7 +472,7 @@ public class DetailActivity extends Activity {
         if (title != null) Tmdb.setSeen(this, title, true);
         String name = title == null ? "" : title.name;
         new Thread(() -> {
-            String url = DeepLinks.find(kind, id, name).get(pkg);
+            String url = DeepLinks.find(this, kind, id, name).get(pkg);
             main.post(() -> { if (!DeepLinks.open(this, pkg, url)) RemoteKeys.run(this, pkg); });
         }).start();
     }
@@ -609,5 +609,19 @@ public class DetailActivity extends Activity {
                 Toast.makeText(this, Ui.tr("O YouTube não está instalado.", "YouTube isn't installed."), Toast.LENGTH_SHORT).show();
             }
         }
+    }
+
+    private boolean stopped;
+
+    @Override protected void onStop() {
+        super.onStop();
+        stopped = true;
+        TvUi.releaseImages(getWindow().getDecorView());   // covered: its pictures go, the cache and the disk keep them
+    }
+
+    @Override protected void onStart() {
+        super.onStart();
+        if (stopped) TvUi.restoreImages(getWindow().getDecorView());
+        stopped = false;
     }
 }

@@ -26,10 +26,28 @@ final class DeepLinks {
     private static final Map<String, Map<String, String>> CACHE = new HashMap<>();
 
     /** App package → link to the title in it ("tv" or "movie", TMDB id); empty when Wikidata has none. */
-    static Map<String, String> find(String kind, int id, String name) {
+    static Map<String, String> find(Context c, String kind, int id, String name) {
         String key = kind + ":" + id;
         synchronized (CACHE) {
             if (CACHE.containsKey(key)) return CACHE.get(key);
+        }
+        android.content.SharedPreferences sp = c.getSharedPreferences("deeplinks", Context.MODE_PRIVATE);
+        String kept = sp.getString(key, null);
+        if (kept != null) {   // "time|json": a month, then asked again (Wikidata gains ids over time)
+            int bar = kept.indexOf('|');
+            try {
+                if (System.currentTimeMillis() - Long.parseLong(kept.substring(0, bar)) < 30L * 24 * 3600_000) {
+                    Map<String, String> out = new HashMap<>();
+                    JSONObject o = new JSONObject(kept.substring(bar + 1));
+                    for (java.util.Iterator<String> it = o.keys(); it.hasNext(); ) {
+                        String app = it.next();
+                        out.put(app, o.getString(app));
+                    }
+                    synchronized (CACHE) { CACHE.put(key, out); }
+                    return out;
+                }
+            } catch (Exception ignored) {
+            }
         }
         Map<String, String> out = new HashMap<>();
         try {
@@ -61,6 +79,7 @@ final class DeepLinks {
             return out;    // not cached: the next try may reach Wikidata
         }
         synchronized (CACHE) { CACHE.put(key, out); }
+        sp.edit().putString(key, System.currentTimeMillis() + "|" + new JSONObject(out)).apply();
         return out;
     }
 

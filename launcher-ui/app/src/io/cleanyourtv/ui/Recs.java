@@ -90,6 +90,11 @@ final class Recs {
 
     private static Recs instance;
 
+    /** Lets go of the pictures not on screen, only where the recommendations were loaded (the home's process). */
+    static synchronized void trimLoaded() {
+        if (instance != null) instance.trim();
+    }
+
     static synchronized Recs get(Context c) {
         if (instance == null) instance = new Recs(c.getApplicationContext());
         return instance;

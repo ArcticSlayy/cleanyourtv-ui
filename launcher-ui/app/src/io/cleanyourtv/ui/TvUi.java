@@ -285,6 +285,29 @@ final class TvUi {
         }
     }
 
+    /**
+     * A screen another app (or another of ours) covers lets go of its pictures, which the cache alone can't free while
+     * views show them; back in front, they come again from the cache or the disk.
+     */
+    static void releaseImages(View v) {
+        if (v instanceof ImageView) {
+            if (v.getTag() instanceof String) ((ImageView) v).setImageDrawable(null);
+        } else if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) releaseImages(g.getChildAt(i));
+        }
+    }
+
+    static void restoreImages(View v) {
+        if (v instanceof ImageView) {
+            ImageView img = (ImageView) v;
+            if (img.getTag() instanceof String && img.getDrawable() == null) Images.load(img, (String) img.getTag());
+        } else if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) restoreImages(g.getChildAt(i));
+        }
+    }
+
     /** The last card of a long row: opens all of it as a grid. */
     static View moreCard(Activity a, float k, Runnable open) {
         int w = Math.round(POSTER_W * k), h = Math.round(POSTER_H * k);

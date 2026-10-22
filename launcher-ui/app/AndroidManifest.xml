@@ -20,6 +20,7 @@
         <package android:name="com.apple.atve.androidtv.appletv" />
         <package android:name="com.hulu.livingroomplus" />
         <package android:name="com.cbs.ott" />
+        <package android:name="com.cbs.ca" />
         <package android:name="com.peacocktv.peacockandroid" />
         <package android:name="com.globo.globotv" />
         <package android:name="com.spotify.tv.android" />

@@ -162,4 +162,18 @@ public class SeasonActivity extends Activity {
                 }).start())
                 .show();
     }
+
+    private boolean stopped;
+
+    @Override protected void onStop() {
+        super.onStop();
+        stopped = true;
+        TvUi.releaseImages(getWindow().getDecorView());   // covered: its pictures go, the cache and the disk keep them
+    }
+
+    @Override protected void onStart() {
+        super.onStart();
+        if (stopped) TvUi.restoreImages(getWindow().getDecorView());
+        stopped = false;
+    }
 }
