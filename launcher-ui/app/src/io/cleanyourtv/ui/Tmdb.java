@@ -130,12 +130,22 @@ final class Tmdb {
 
     /** The titles of a list answer; `kind` is used when the items don't say ("movie"/"tv" endpoints). */
     static List<Title> titles(JSONObject page, String kind) {
+        return titles(page, "results", kind);
+    }
+
+    static List<Title> titles(JSONObject page, String key, String kind) {
         List<Title> out = new ArrayList<>();
-        JSONArray results = page.optJSONArray("results");
+        JSONArray results = page.optJSONArray(key);
         for (int i = 0; results != null && i < results.length(); i++) {
             JSONObject o = results.optJSONObject(i);
             if (o == null) continue;
             String k = o.optString("media_type", kind);
+            if ("person".equals(k)) {
+                String face = o.optString("profile_path", "");
+                if (face.isEmpty() || "null".equals(face)) continue;
+                out.add(new Title("person", o.optInt("id"), o.optString("name"), face, "", o.optString("known_for_department", ""), o.optDouble("popularity", 0)));
+                continue;
+            }
             if (!"movie".equals(k) && !"tv".equals(k)) continue;
             String poster = o.optString("poster_path", "");
             if (poster.isEmpty() || "null".equals(poster)) continue;
@@ -224,7 +234,80 @@ final class Tmdb {
         post("/" + t.kind + "/" + t.id + "/rating?session_id=" + session(c), new JSONObject().put("value", value));
     }
 
+    /** {favorite, rated value (0 = none), watchlist} for a title on the account. */
+    static JSONObject states(Context c, String kind, int id) {
+        if (!signedIn(c)) return new JSONObject();
+        try {
+            return new JSONObject(call("GET", "/" + kind + "/" + id + "/account_states?session_id=" + session(c), null));
+        } catch (Exception e) {
+            return new JSONObject();
+        }
+    }
+
+    static int ratingOf(JSONObject states) {
+        JSONObject rated = states.optJSONObject("rated");
+        return rated == null ? 0 : (int) Math.round(rated.optDouble("value"));
+    }
+
+    static void setFavorite(Context c, Title t, boolean on) throws IOException, JSONException {
+        post("/account/" + account(c) + "/favorite?session_id=" + session(c),
+                new JSONObject().put("media_type", t.kind).put("media_id", t.id).put("favorite", on));
+    }
+
+    static void unrate(Context c, Title t) throws IOException {
+        call("DELETE", "/" + t.kind + "/" + t.id + "/rating?session_id=" + session(c), null);
+    }
+
+    static void rateEpisode(Context c, int series, int season, int episode, int value) throws IOException, JSONException {
+        post("/tv/" + series + "/season/" + season + "/episode/" + episode + "/rating?session_id=" + session(c), new JSONObject().put("value", value));
+    }
+
+    /** The account's favorites, or its rated titles ("favorite" or "rated"), shows first. */
+    static List<Title> accountList(Context c, String which) throws IOException, JSONException {
+        List<Title> out = new ArrayList<>();
+        if (!signedIn(c)) return out;
+        for (String kind : new String[] {"tv", "movies"}) {
+            JSONObject page = new JSONObject(call("GET", "/account/" + account(c) + "/" + which + "/" + kind
+                    + "?session_id=" + session(c) + "&language=" + lang() + "&sort_by=created_at.desc", null));
+            out.addAll(titles(page, kind.equals("tv") ? "tv" : "movie"));
+        }
+        return out;
+    }
+
+    /** The account's own lists: {id, name, item count}. */
+    static List<String[]> lists(Context c) throws IOException, JSONException {
+        List<String[]> out = new ArrayList<>();
+        JSONArray results = new JSONObject(call("GET", "/account/" + account(c) + "/lists?session_id=" + session(c), null)).optJSONArray("results");
+        for (int i = 0; results != null && i < results.length(); i++) {
+            JSONObject o = results.getJSONObject(i);
+            out.add(new String[] {String.valueOf(o.getInt("id")), o.optString("name"), String.valueOf(o.optInt("item_count"))});
+        }
+        return out;
+    }
+
+    static String createList(Context c, String name) throws IOException, JSONException {
+        return String.valueOf(post("/list?session_id=" + session(c), new JSONObject().put("name", name).put("description", "")
+                .put("language", "pt")).getInt("list_id"));
+    }
+
+    /** Lists hold movies only in TMDB's v3 API. */
+    static void addToList(Context c, String list, int movie) throws IOException, JSONException {
+        post("/list/" + list + "/add_item?session_id=" + session(c), new JSONObject().put("media_id", movie));
+    }
+
     static List<Title> seen(Context c) { return local(c, "seen"); }
+
+    /** Episodes marked as seen on the TV, as "series:season:episode". */
+    static boolean episodeSeen(Context c, int series, int season, int episode) {
+        return sp(c).getStringSet("episodes", new java.util.HashSet<>()).contains(series + ":" + season + ":" + episode);
+    }
+
+    static void setEpisodeSeen(Context c, int series, int season, int episode, boolean on) {
+        java.util.Set<String> all = new java.util.HashSet<>(sp(c).getStringSet("episodes", new java.util.HashSet<>()));
+        String key = series + ":" + season + ":" + episode;
+        if (on) all.add(key); else all.remove(key);
+        sp(c).edit().putStringSet("episodes", all).apply();
+    }
     static boolean isSeen(Context c, String kind, int id) { return localHas(c, "seen", kind + ":" + id); }
     static void setSeen(Context c, Title t, boolean on) { localSet(c, "seen", t, on); }
 

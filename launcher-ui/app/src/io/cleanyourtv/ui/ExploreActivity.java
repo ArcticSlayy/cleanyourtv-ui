@@ -31,7 +31,15 @@ import java.util.concurrent.Executors;
  * With EXTRA_SECTION = "watchlist" (the remote's bookmark button) it shows the list alone.
  */
 public class ExploreActivity extends Activity {
-    static final String EXTRA_SECTION = "section";
+    static final String EXTRA_SECTION = "section", EXTRA_TITLE = "title", EXTRA_PATH = "path", EXTRA_KIND = "kind";
+
+    /** A list of titles from one TMDB path (a search, a keyword), three pages, one row per page. */
+    static void openList(android.content.Context c, String title, String path, String kind) {
+        c.startActivity(new android.content.Intent(c, ExploreActivity.class)
+                .putExtra(EXTRA_TITLE, title).putExtra(EXTRA_PATH, path).putExtra(EXTRA_KIND, kind));
+    }
+
+    private String listPath, listKind;
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newFixedThreadPool(3);
@@ -56,6 +64,8 @@ public class ExploreActivity extends Activity {
         Ui.init(this);
         k = TvUi.k(this);
         watchlistOnly = "watchlist".equals(getIntent().getStringExtra(EXTRA_SECTION));
+        listPath = getIntent().getStringExtra(EXTRA_PATH);
+        listKind = getIntent().getStringExtra(EXTRA_KIND);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(TvUi.BG);
         ScrollView scroll = new ScrollView(this);
@@ -66,11 +76,25 @@ public class ExploreActivity extends Activity {
         rows.setOrientation(LinearLayout.VERTICAL);
         rows.setClipChildren(false);
         rows.setPadding(Math.round(96 * k), Math.round(64 * k), 0, Math.round(80 * k));
+        rows.setClipToPadding(false);
         TextView title = TvUi.text(this, k, 64, Ui.displaySemibold, TvUi.INK);
-        title.setText(watchlistOnly ? Ui.tr("Minha lista", "My list") : Ui.tr("Explorar", "Explore"));
-        rows.addView(title);
+        title.setText(listPath != null ? getIntent().getStringExtra(EXTRA_TITLE)
+                : watchlistOnly ? Ui.tr("Minha lista", "My list") : Ui.tr("Explorar", "Explore"));
+        if (listPath == null && !watchlistOnly) {
+            LinearLayout top = new LinearLayout(this);
+            top.setOrientation(LinearLayout.HORIZONTAL);
+            top.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            top.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            TextView search = TvUi.button(this, k, "⌕  " + Ui.tr("Buscar", "Search"), v -> askSearch());
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.rightMargin = Math.round(96 * k);
+            top.addView(search, lp);
+            rows.addView(top);
+        } else {
+            rows.addView(title);
+        }
         TextView sub = TvUi.text(this, k, 26, Ui.regular, TvUi.DIM);
-        sub.setText(watchlistOnly
+        sub.setText(listPath != null ? Ui.tr("Dados do TMDB", "Data from TMDB") : watchlistOnly
                 ? (Tmdb.signedIn(this) ? Ui.tr("Da sua conta TMDB", "From your TMDB account") + " · " + Tmdb.accountName(this)
                         : Ui.tr("Salva nesta TV. Conecte sua conta TMDB em Ajustes para sincronizar.", "Kept on this TV. Connect your TMDB account in Settings to sync."))
                 : Ui.tr("O que está em alta, nos seus serviços e do seu jeito · dados do TMDB",
@@ -120,8 +144,9 @@ public class ExploreActivity extends Activity {
     private void start(int gen, List<Section> sections, boolean personalOnly) {
         int[] left = {sections.size()};
         int[] shown = {0};
+        if (personalOnly && listPath != null) return;
         if (personalOnly && !watchlistOnly) {
-            sections = sections.subList(0, 3);
+            sections = sections.subList(0, 5);
             left[0] = sections.size();
         }
         for (int i = 0; i < sections.size(); i++) {
@@ -155,7 +180,13 @@ public class ExploreActivity extends Activity {
     }
 
     /** Puts a row in its slot (rows arrive in any order), keeping the focused poster where it is. */
+    private final Map<Integer, String> placedKeys = new HashMap<>();
+
     private void place(int slot, String title, List<Tmdb.Title> titles) {
+        StringBuilder keys = new StringBuilder(title);
+        for (Tmdb.Title t : titles) keys.append(',').append(t.key());
+        if (placed.containsKey(slot) && keys.toString().equals(placedKeys.get(slot))) return;   // unchanged: keep the focus where it is
+        placedKeys.put(slot, keys.toString());
         View old = placed.remove(slot);
         if (old != null) rows.removeView(old);
         if (titles.isEmpty()) return;
@@ -170,8 +201,44 @@ public class ExploreActivity extends Activity {
         if (focus == null || focus == rows.getParent() || !focus.isAttachedToWindow()) row.requestFocus();
     }
 
+    private void askSearch() {
+        android.widget.EditText field = new android.widget.EditText(this);
+        field.setSingleLine(true);
+        field.setHint(Ui.tr("Filme, série ou pessoa", "Movie, show or person"));
+        field.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle(Ui.tr("Buscar", "Search"))
+                .setView(field)
+                .setPositiveButton(Ui.tr("Buscar", "Search"), (d, w) -> search(field.getText().toString()))
+                .setNegativeButton(Ui.tr("Cancelar", "Cancel"), null)
+                .create();
+        field.setOnEditorActionListener((v, action, event) -> {
+            dialog.dismiss();
+            search(field.getText().toString());
+            return true;
+        });
+        dialog.show();
+    }
+
+    private void search(String query) {
+        String q = query.trim();
+        if (q.isEmpty()) return;
+        try {
+            openList(this, Ui.tr("Busca: ", "Search: ") + q, "/search/multi?include_adult=false&query=" + java.net.URLEncoder.encode(q, "UTF-8"), "movie");
+        } catch (java.io.UnsupportedEncodingException ignored) {
+        }
+    }
+
     private List<Section> sections() {
         List<Section> out = new ArrayList<>();
+        if (listPath != null) {
+            for (int page = 1; page <= 3; page++) {
+                final int p = page;
+                out.add(new Section(page == 1 ? Ui.tr("Resultados", "Results") : "", () -> Tmdb.titles(
+                        Tmdb.get(listPath + (listPath.contains("?") ? "&" : "?") + "page=" + p), listKind == null ? "movie" : listKind)));
+            }
+            return out;
+        }
         if (watchlistOnly) {
             out.add(new Section(Ui.tr("Séries", "Shows"), () -> only(Tmdb.watchlist(this), "tv")));
             out.add(new Section(Ui.tr("Filmes", "Movies"), () -> only(Tmdb.watchlist(this), "movie")));
@@ -184,6 +251,8 @@ public class ExploreActivity extends Activity {
         Tmdb.Title last = seen.isEmpty() ? null : seen.get(0);
         out.add(new Section(last == null ? "" : Ui.tr("Porque você viu ", "Because you watched ") + last.name, () -> last == null
                 ? new ArrayList<>() : fresh(Tmdb.titles(Tmdb.get("/" + last.kind + "/" + last.id + "/recommendations"), last.kind))));
+        out.add(new Section(Ui.tr("Favoritos", "Favorites"), () -> Tmdb.accountList(this, "favorite")));
+        out.add(new Section(Ui.tr("Suas notas", "Your ratings"), () -> Tmdb.accountList(this, "rated")));
         out.add(new Section(Ui.tr("Em alta hoje", "Trending today"), () -> Tmdb.titles(Tmdb.get("/trending/all/day"), "movie")));
         out.add(new Section(Ui.tr("Séries em alta na semana", "Trending shows this week"), () -> mine("tv", Tmdb.titles(Tmdb.get("/trending/tv/week"), "tv"))));
         out.add(new Section(Ui.tr("Filmes em alta na semana", "Trending movies this week"), () -> mine("movie", Tmdb.titles(Tmdb.get("/trending/movie/week"), "movie"))));
@@ -198,6 +267,12 @@ public class ExploreActivity extends Activity {
         } catch (Exception e) {
             AppLog.w("explore services: " + e.getMessage());
         }
+        out.add(new Section(Ui.tr("Episódios novos hoje", "New episodes today"), () -> mine("tv", Tmdb.titles(Tmdb.get("/tv/airing_today"), "tv"))));
+        out.add(new Section(Ui.tr("Nos cinemas", "In theaters"), () -> Tmdb.titles(Tmdb.get("/movie/now_playing?region=" + Tmdb.REGION), "movie")));
+        out.add(new Section(Ui.tr("Em breve nos cinemas", "Coming to theaters"), () -> Tmdb.titles(Tmdb.get("/movie/upcoming?region=" + Tmdb.REGION), "movie")));
+        out.add(new Section(Ui.tr("Mais bem avaliados", "Top rated"), () -> mix(
+                Tmdb.titles(Tmdb.get("/tv/top_rated"), "tv"), Tmdb.titles(Tmdb.get("/movie/top_rated"), "movie"))));
+        out.add(new Section(Ui.tr("Pessoas em alta", "Trending people"), () -> Tmdb.titles(Tmdb.get("/trending/person/week"), "person")));
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
         out.add(new Section(Ui.tr("Estreias recentes no streaming", "New on streaming"), () -> discover("movie",
                 "&sort_by=primary_release_date.desc&primary_release_date.lte=" + today + "&vote_count.gte=40" + services())));

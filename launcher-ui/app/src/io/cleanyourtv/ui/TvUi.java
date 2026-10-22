@@ -45,18 +45,19 @@ final class TvUi {
         return d;
     }
 
-    /** Focused: a little bigger, a white outline and a shadow, like the home screen's tiles. */
+    /** Focused: lifted like the home screen's tiles, bigger with a deep shadow, no outline. */
     static void focusable(View v, float k, float radius) {
+        focusable(v, k, radius, null);
+    }
+
+    static void focusable(View v, float k, float radius, TextView caption) {
         v.setFocusable(true);
         v.setFocusableInTouchMode(true);
-        GradientDrawable ring = new GradientDrawable();
-        ring.setColor(Color.TRANSPARENT);
-        ring.setCornerRadius(radius);
-        ring.setStroke(Math.round(4 * k), INK);
+        v.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
         v.setOnFocusChangeListener((view, has) -> {
-            float s = has ? 1.08f : 1f;
-            view.animate().scaleX(s).scaleY(s).translationZ(has ? 16 * k : 0).setDuration(150).start();
-            view.setForeground(has ? ring : null);
+            float s = has ? 1.1f : 1f;
+            view.animate().scaleX(s).scaleY(s).translationZ(has ? 28 * k : 0).setDuration(160).start();
+            if (caption != null) caption.setTextColor(has ? INK : DIM);
         });
     }
 
@@ -73,8 +74,9 @@ final class TvUi {
         b.setOnFocusChangeListener((v, has) -> {
             b.setBackground(round(has ? INK : 0x33FFFFFF, 40 * k));
             b.setTextColor(has ? 0xFF14161A : INK);
-            v.animate().scaleX(has ? 1.05f : 1f).scaleY(has ? 1.05f : 1f).setDuration(120).start();
+            v.animate().scaleX(has ? 1.06f : 1f).scaleY(has ? 1.06f : 1f).translationZ(has ? 12 * k : 0).setDuration(140).start();
         });
+        b.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
         return b;
     }
 
@@ -96,7 +98,7 @@ final class TvUi {
         LinearLayout line = new LinearLayout(a);
         line.setOrientation(LinearLayout.HORIZONTAL);
         line.setClipChildren(false);
-        line.setPadding(Math.round(12 * k), Math.round(16 * k), Math.round(60 * k), Math.round(16 * k));
+        line.setPadding(Math.round(24 * k), Math.round(30 * k), Math.round(80 * k), Math.round(20 * k));
         for (Tmdb.Title t : titles) line.addView(poster(a, k, t, open));
         scroll.addView(line);
         box.addView(scroll);
@@ -122,15 +124,15 @@ final class TvUi {
         fallback.setPadding(Math.round(14 * k), 0, Math.round(14 * k), 0);
         card.addView(fallback, 0, new FrameLayout.LayoutParams(w, h));
         Images.load(img, t.poster.isEmpty() ? null : Tmdb.POSTER + t.poster);
-        focusable(card, k, 14 * k);
         card.setContentDescription(t.name + (t.year.isEmpty() ? "" : ", " + t.year));
         card.setOnClickListener(v -> open.open(t));
         cell.addView(card, new LinearLayout.LayoutParams(w, h));
         TextView name = text(a, k, 22, Ui.regular, DIM);
+        focusable(card, k, 14 * k, name);
         name.setText(t.name);
         name.setSingleLine(true);
         name.setEllipsize(TextUtils.TruncateAt.END);
-        name.setPadding(0, Math.round(12 * k), 0, 0);
+        name.setPadding(0, Math.round(26 * k), 0, 0);
         cell.addView(name, new LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.rightMargin = Math.round(26 * k);
