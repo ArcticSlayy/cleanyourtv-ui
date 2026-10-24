@@ -33,6 +33,8 @@ Connect
   `_adb-tls-connect._tcp` with `dns-sd -B` or `adb mdns services`, ask me for the code and port under
   Developer options > Wireless debugging > Pair device with pairing code, then `adb pair`, `adb connect`
   and `adb tcpip 5555`. Android switches Wireless debugging off whenever Wi-Fi drops.
+  Some firmware runs network ADB on another fixed port instead (a projector used 5877): if 5555 refuses and
+  nothing advertises Wireless debugging, scan the TV's own TCP ports and try each open one with `TV_PORT`.
 - Tell me when the "Allow USB debugging?" prompt will appear on the TV so I can accept it.
 - If `adb install` hangs on Android 14 it is waiting for an on-screen confirmation; push the APK and run
   `pm install -r` over the shell instead.
@@ -94,7 +96,10 @@ Debloat
   it and you cannot tell which.
 - After the last batch, reboot once and compare `pm list packages -d` with what you disabled: some
   firmware re-enables packages at every boot from its own list (TCL Android 9 does this for its user
-  center). Note those in the list header instead of disabling them again after each boot.
+  center). Note those in the list header instead of disabling them again after each boot. If
+  setupwraith or the stock launcher came back and Home is black, check `logcat | grep
+  RecoveryActivity` and re-enable the stock launcher before anything else
+  (`docs/devices/acer-r4g.md`).
 - Offer me ad-blocking DNS as an optional extra: on Android 9 and newer, Private DNS set to an
   ad-blocking resolver (`settings put global private_dns_specifier dns.adguard-dns.com`, then
   `settings put global private_dns_mode hostname`). Tell me it doesn't block YouTube ads, check an app
