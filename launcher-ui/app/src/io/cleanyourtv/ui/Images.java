@@ -11,8 +11,11 @@ import android.widget.ImageView;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -37,14 +40,16 @@ final class Images {
     private static final ExecutorService POOL = Executors.newFixedThreadPool(4);
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final Map<String, List<ImageView>> WAITING = new HashMap<>();
-    private static File dir;
+    private static final Object DISK_LOCK = new Object();
+    private static volatile File dir;
 
     /** The disk cache's folder; old files are dropped once per start. */
     static synchronized void init(Context c) {
         if (dir != null) return;
-        dir = new File(c.getApplicationContext().getCacheDir(), "img");
+        File folder = new File(c.getApplicationContext().getCacheDir(), "img");
         //noinspection ResultOfMethodCallIgnored
-        dir.mkdirs();
+        folder.mkdirs();
+        dir = folder;
         POOL.execute(Images::prune);
     }
 
@@ -97,16 +102,38 @@ final class Images {
             c.setReadTimeout(15000);
             byte[] bytes;
             try (InputStream in = c.getInputStream()) {
+                // We never request ranges; even a decodable partial body must not replace the cache.
+                if (c.getResponseCode() == HttpURLConnection.HTTP_PARTIAL || c.getHeaderField("Content-Range") != null)
+                    throw new IOException("Partial image response");
                 bytes = Tmdb.readBytes(in);
+                long length = c.getContentLengthLong();
+                if (length >= 0 && bytes.length != length) throw new IOException("Incomplete image download");
             } finally {
                 c.disconnect();
             }
-            if (f != null) {
-                try (FileOutputStream out = new FileOutputStream(f)) { out.write(bytes); } catch (Exception ignored) {}
-            }
-            return BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options(url));
+            Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options(url));
+            if (b == null) return f != null && f.isFile() ? decode(f, url) : null;
+            if (f != null) store(f, bytes);
+            return b;
         } catch (Exception e) {
             return f != null && f.isFile() ? decode(f, url) : null;   // offline: an old copy beats nothing
+        }
+    }
+
+    /** Share prune's disk lock, not init's monitor: warm foreground init must not wait for disk IO. */
+    private static void store(File f, byte[] bytes) {
+        synchronized (DISK_LOCK) {
+            File tmp = null;
+            try {
+                tmp = File.createTempFile("img-", ".tmp", f.getParentFile());
+                try (FileOutputStream out = new FileOutputStream(tmp)) { out.write(bytes); }
+                Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception ignored) {
+                // The decoded download is still usable in memory. No non-atomic delete/replace fallback.
+            } finally {
+                //noinspection ResultOfMethodCallIgnored
+                try { if (tmp != null) tmp.delete(); } catch (SecurityException ignored) {}
+            }
         }
     }
 
@@ -123,26 +150,28 @@ final class Images {
 
     /** Drops files well past their TTL, then the oldest until the folder fits in DISK_MAX. */
     private static void prune() {
-        File[] files = dir.listFiles();
-        if (files == null) return;
-        long now = System.currentTimeMillis(), total = 0;
-        List<File> kept = new ArrayList<>();
-        for (File f : files) {
-            //noinspection ResultOfMethodCallIgnored
-            if (now - f.lastModified() > 2 * TTL) f.delete();
-            else {
-                kept.add(f);
-                total += f.length();
+        synchronized (DISK_LOCK) {
+            File[] files = dir.listFiles();
+            if (files == null) return;
+            long now = System.currentTimeMillis(), total = 0;
+            List<File> kept = new ArrayList<>();
+            for (File f : files) {
+                //noinspection ResultOfMethodCallIgnored
+                if (now - f.lastModified() > 2 * TTL) f.delete();
+                else {
+                    kept.add(f);
+                    total += f.length();
+                }
             }
-        }
-        if (total <= DISK_MAX) return;
-        File[] byAge = kept.toArray(new File[0]);
-        Arrays.sort(byAge, (a, b) -> Long.compare(a.lastModified(), b.lastModified()));
-        for (File f : byAge) {
-            if (total <= DISK_MAX * 3 / 4) break;
-            total -= f.length();
-            //noinspection ResultOfMethodCallIgnored
-            f.delete();
+            if (total <= DISK_MAX) return;
+            File[] byAge = kept.toArray(new File[0]);
+            Arrays.sort(byAge, (a, b) -> Long.compare(a.lastModified(), b.lastModified()));
+            for (File f : byAge) {
+                if (total <= DISK_MAX * 3 / 4) break;
+                total -= f.length();
+                //noinspection ResultOfMethodCallIgnored
+                f.delete();
+            }
         }
     }
 
