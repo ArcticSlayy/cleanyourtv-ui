@@ -4,15 +4,26 @@ Run: JAVA_HOME=<JDK 17-21> ANDROID_HOME=<SDK> python3 -m unittest discover \
   -s tests -p test_artwork_cache.py -v
 ImageIO replaces Android decoding (no Android codec/pixel-format equivalence claim).
 Only unused UI boundaries are faked. No dependencies or external requests.
+The disk-fault and pause cases need a SecurityManager (JDK 17-21); on a JDK without one they are skipped.
 """
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests/artwork_cache"
+# Cases that inject disk faults or pause disk IO through a SecurityManager, which JDK 24 and later refuse.
+SECURITY_MANAGER_CASES = {"create_failure", "write_failure", "promotion_failure", "cleanup_failure",
+                          "prune_refresh", "init_store"}
+PROBE = """public class Probe { public static void main(String[] a) {
+    System.setSecurityManager(new SecurityManager() {
+        @Override public void checkPermission(java.security.Permission p) {}
+    });
+    System.setSecurityManager(null);
+} }"""
 
 
 class ArtworkCache(unittest.TestCase):
@@ -27,7 +38,8 @@ class ArtworkCache(unittest.TestCase):
         jars = list((Path(sdk) / "platforms").glob("android-*/android.jar"))
         if not jars:
             raise AssertionError("Android platform jar missing")
-        android = max(jars, key=lambda p: int(p.parent.name.split("-")[1]))
+        # android-34, android-37.0, android-34-ext8: compared by their numbers, like build.sh's sort -V.
+        android = max(jars, key=lambda p: tuple(int(n) for n in re.findall(r"\d+", p.parent.name)))
         work = ROOT / "work/artwork-cache-tests"
         work.mkdir(parents=True, exist_ok=True)
         cls.tmp = tempfile.TemporaryDirectory(dir=work)
@@ -41,6 +53,10 @@ class ArtworkCache(unittest.TestCase):
                      "-cp", str(android), "-d", str(prod), str(src / "Images.java"),
                      str(src / "Tmdb.java"), *map(str, (FIXTURES / "compile").rglob("*.java"))])
         cls.cp = os.pathsep.join(map(str, (runtime, prod, android)))
+        probe = cls.work / "Probe.java"
+        probe.write_text(PROBE, encoding="utf-8")
+        cls.security_manager = subprocess.run([cls.java, "-Djava.security.manager=allow", str(probe)], cwd=ROOT,
+                                              capture_output=True, timeout=60).returncode == 0
         cls.command([javac, "-nowarn", "-encoding", "UTF-8", "-cp", cls.cp, "-d", str(runtime),
                      *map(str, (FIXTURES / "runtime").rglob("*.java")), str(FIXTURES / "ArtworkCacheTest.java")])
 
@@ -53,7 +69,10 @@ class ArtworkCache(unittest.TestCase):
         return result.stdout
 
     def behavior(self, name):
-        output = self.command([self.java, "-Djava.awt.headless=true", "-Djava.security.manager=allow", "-ea", "-cp", self.cp,
+        if name in SECURITY_MANAGER_CASES and not self.security_manager:
+            self.skipTest("needs a SecurityManager (JDK 17-21)")
+        flags = ["-Djava.security.manager=allow"] if self.security_manager else []
+        output = self.command([self.java, "-Djava.awt.headless=true", *flags, "-ea", "-cp", self.cp,
                                "io.cleanyourtv.ui.ArtworkCacheTest", name, str(self.work)])
         self.assertIn("PASS " + name, output)
 

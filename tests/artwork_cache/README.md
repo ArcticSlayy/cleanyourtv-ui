@@ -56,6 +56,7 @@ call to complete before releasing disk IO. Latches and bounded joins exercise
 the production path; the observation deadline is not measured device latency.
 
 SecurityManager is deprecated on these JDKs and emits warnings; it is disabled
-on newer JDK releases. Use the stated JDK range rather than silently skipping
-failure-path assertions. Tests need no downloaded libraries and contact no
+on newer JDK releases. The runner checks for it first: on a JDK without one, the
+six cases that need it (the disk-fault ones, `prune_refresh` and `init_store`) are
+reported as skipped and the rest still run. Use the stated JDK range to run them all. Tests need no downloaded libraries and contact no
 external service. All sockets/threads and temporary test directories are closed.
